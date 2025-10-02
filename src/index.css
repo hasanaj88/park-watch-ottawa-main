@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ottawa Parking System Design Tokens */
+
+@layer base {
+  :root {
+    /* Light theme colors */
+    --background: 207 27% 98%;
+    --foreground: 219 39% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 219 39% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 219 39% 11%;
+    --primary: 219 39% 11%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 219 39% 11%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 219 39% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 219 39% 11%;
+    --radius: 0.875rem;
+
+    /* Parking-specific colors */
+    --parking-bg: 207 27% 98%;
+    --parking-card: 0 0% 100%;
+    --parking-border: 220 13% 91%;
+    --parking-available: 142 76% 36%;
+    --parking-busy: 0 84% 60%;
+    --parking-ring: 158 64% 52%;
+    --parking-muted: 215.4 16.3% 46.9%;
+    
+    /* Glassmorphism effects */
+    --glass-bg: 0 0% 100% / 0.8;
+    --glass-border: 220 13% 91% / 0.2;
+    --backdrop-blur: blur(12px);
+  }
+
+  .dark {
+    /* Dark theme - matching your original design */
+    --background: 221 39% 11%;
+    --foreground: 210 40% 98%;
+    --card: 220 13% 18%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 13% 18%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 219 39% 11%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 158 64% 52%;
+
+    /* Dark parking-specific colors - matching your original */
+    --parking-bg: 221 39% 11%;
+    --parking-card: 220 13% 18%;
+    --parking-border: 217.2 32.6% 17.5%;
+    --parking-available: 142 76% 36%;
+    --parking-busy: 0 84% 60%;
+    --parking-ring: 158 64% 52%;
+    --parking-muted: 215 20.2% 65.1%;
+    
+    /* Dark glassmorphism */
+    --glass-bg: 220 13% 18% / 0.6;
+    --glass-border: 217.2 32.6% 17.5% / 0.2;
+  }
+
+  /* Parking status indicators */
+  .status-available {
+    color: hsl(var(--parking-available));
+    background-color: hsl(var(--parking-available) / 0.1);
+    border-color: hsl(var(--parking-available) / 0.2);
+  }
+
+  .status-busy {
+    color: hsl(var(--parking-busy));
+    background-color: hsl(var(--parking-busy) / 0.1);
+    border-color: hsl(var(--parking-busy) / 0.2);
+  }
+
+  .status-dot-available {
+    background-color: hsl(var(--parking-available));
+  }
+
+  .status-dot-busy {
+    background-color: hsl(var(--parking-busy));
+  }
+
+  /* Glassmorphism utilities */
+  .glass-effect {
+    background: hsl(var(--glass-bg));
+    backdrop-filter: var(--backdrop-blur);
+    border: 1px solid hsl(var(--glass-border));
+  }
+
+  /* Grid background pattern */
+  .grid-pattern {
+    background-image: 
+      linear-gradient(0deg, transparent 24px, hsl(var(--border) / 0.3) 25px),
+      linear-gradient(90deg, transparent 24px, hsl(var(--border) / 0.3) 25px);
+    background-size: 25px 25px;
+  }
+
+  /* Parking map pins layout */
+  .parking-pins-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
