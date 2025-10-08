@@ -1,30 +1,71 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!--  Basic Meta Tags -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ottawa Live Parking - Real-time Parking Status</title>
 
     <meta
       name="description"
-      content="Real-time parking availability in Ottawa with live camera data. Find available parking spots with live updates and navigation."
+      content="Real-time parking availability in Ottawa with live camera data. Find available parking spots, live updates, and easy navigation."
     />
-    <meta name="author" content="Ottawa Live Parking" />
     <meta
       name="keywords"
-      content="Ottawa parking, live parking, parking availability, Ottawa downtown parking, real-time parking"
+      content="Ottawa parking, live parking, downtown Ottawa parking, real-time parking, parking availability, Ottawa Live Parking"
     />
+    <meta name="author" content="Ottawa Live Parking" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://www.ottawaliveparking.ca/" />
     <link rel="icon" type="image/svg+xml" href="/parking.svg" />
 
-    <meta property="og:title" content="Ottawa Live Parking - Real-time Parking Status" />
-    <meta property="og:description" content="Real-time parking availability in Ottawa with live camera data. Find available parking spots with live updates and navigation." />
+    <!--  Open Graph (Facebook, LinkedIn, etc.) -->
     <meta property="og:type" content="website" />
+    <meta property="og:title" content="Ottawa Live Parking - Real-time Parking Status" />
+    <meta
+      property="og:description"
+      content="Find available parking spots in Ottawa instantly. Get real-time camera data, updates, and navigation support."
+    />
+    <meta property="og:url" content="https://www.ottawaliveparking.ca/" />
+    <meta property="og:image" content="https://www.ottawaliveparking.ca/parking-banner.jpg" />
+    <meta property="og:site_name" content="Ottawa Live Parking" />
 
+    <!--  Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Ottawa Live Parking - Real-time Parking Status" />
-    <meta name="twitter:description" content="Find available parking in Ottawa with real-time updates" />
+    <meta
+      name="twitter:description"
+      content="Find available parking across Ottawa with real-time updates and live camera data."
+    />
+    <meta name="twitter:image" content="https://www.ottawaliveparking.ca/parking-banner.jpg" />
+    <meta name="twitter:creator" content="@OttawaLiveParking" />
 
-    <!-- ✅ Add Canonical Tag -->
-    <link rel="canonical" href="https://www.ottawaliveparking.ca/" />
+    <!-- Structured Data (LocalBusiness Schema - JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": "Ottawa Live Parking",
+        "url": "https://www.ottawaliveparking.ca/",
+        "logo": "https://www.ottawaliveparking.ca/parking.svg",
+        "description": "Real-time parking availability in Ottawa with live camera updates and navigation.",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Ottawa",
+          "addressRegion": "ON",
+          "addressCountry": "CA"
+        },
+        "sameAs": [
+          "https://www.facebook.com/OttawaLiveParking",
+          "https://twitter.com/OttawaLiveParking"
+        ],
+        "image": "https://www.ottawaliveparking.ca/parking-banner.jpg"
+      }
+    </script>
+
+    <!-- Accessibility & Theme -->
+    <meta name="theme-color" content="#004aad" />
+    <meta name="color-scheme" content="light dark" />
   </head>
 
   <body>
