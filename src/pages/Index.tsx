@@ -66,7 +66,7 @@ const Index = () => {
         <ParkingControls
           filters={filters}
           onFiltersChange={updateFilters}
-          onSearch={() => {}} // Search handled in SearchResults
+          onSearch={() => {}} // Search handled in SearchResults tab
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -83,8 +83,9 @@ const Index = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => selectLot('')}
+                        onClick={() => selectLot(lots[0]?.id ?? '')}
                         className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors flex items-center gap-2"
+                        aria-label="Back to overview"
                       >
                         ← Back to Overview
                       </button>
@@ -104,7 +105,9 @@ const Index = () => {
               <div className="space-y-6">
                 <ParkingDetail
                   lot={selectedLot}
-                  availabilityPercentage={getAvailabilityPercentage(selectedLot ?? undefined)}
+                  availabilityPercentage={
+                    selectedLot ? getAvailabilityPercentage(selectedLot) : undefined
+                  }
                   onNavigate={handleNavigate}
                 />
 
@@ -141,7 +144,7 @@ const Index = () => {
         </div>
       </footer>
 
-      {/* AI Chat – assumes internal styling positions it (e.g., fixed bottom-right) */}
+      {/* AI Chat – the component includes its own floating trigger/button */}
       <AIChat />
     </div>
   );
