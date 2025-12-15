@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 interface SearchResultsProps {
-  onSearch: (query: string) => Promise<ParkingLot[]>; // ✅ async now
+  onSearch: (query: string) => Promise<ParkingLot[]>;//  async now
   onLotSelect: (lotId: string) => void;
   onNavigate: (lot: ParkingLot) => void;
 }
@@ -26,40 +26,34 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelled = false;
 
-    const run = async () => {
-      const q = searchQuery.trim();
+  const run = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);   
+  return;
+}
 
-      if (!q) {
-        setSearchResults([]);
-        setIsSearching(false);
-        return;
-      }
+    setIsSearching(true);
 
-      setIsSearching(true);
+    try {
+      const results = await onSearch(searchQuery);
+      if (!cancelled) setSearchResults(results);
+    } catch (e) {
+      console.error("Search error:", e);
+      if (!cancelled) setSearchResults([]);
+    } finally {
+      if (!cancelled) setIsSearching(false);
+    }
+  };
 
-      try {
-        const results = await onSearch(q);
-        if (!cancelled) setSearchResults(results);
-      } catch (err) {
-        if (!cancelled) setSearchResults([]);
-        // optional: console.error(err);
-      } finally {
-        if (!cancelled) setIsSearching(false);
-      }
-    };
-
-    // ✅ Debounce so we don't call geocode on every keystroke
-    timer = setTimeout(run, 300);
-
-    // cleanup
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [searchQuery, onSearch]);
+  const t = setTimeout(run, 250); // debounce
+  return () => {
+    cancelled = true;
+    clearTimeout(t);
+  };
+}, [searchQuery, onSearch]);
 
   const handleSearch = (query: string) => setSearchQuery(query);
 
