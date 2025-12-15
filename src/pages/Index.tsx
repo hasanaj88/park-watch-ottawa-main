@@ -10,7 +10,7 @@ import { ParkingList } from '@/components/parking/ParkingList';
 import { SearchResults } from '@/components/parking/SearchResults';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { AIChat } from '@/components/AIChat';
+import AIChat from '@/components/AIChat';
 
 const Index = () => {
   const {

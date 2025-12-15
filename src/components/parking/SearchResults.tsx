@@ -4,10 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ParkingLot } from '@/types/parking';
-import { Search, MapPin, Navigation, Clock, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react';
+import {
+  Search,
+  MapPin,
+  Navigation,
+  Clock,
+  DollarSign,
+  CheckCircle,
+  AlertTriangle
+} from 'lucide-react';
 
 interface SearchResultsProps {
-  onSearch: (query: string) => ParkingLot[];
+  onSearch: (query: string) => Promise<ParkingLot[]>; // ✅ async now
   onLotSelect: (lotId: string) => void;
   onNavigate: (lot: ParkingLot) => void;
 }
@@ -18,24 +26,50 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    if (searchQuery.trim()) {
-      setIsSearching(true);
-      const results = onSearch(searchQuery);
-      setTimeout(() => {
-        setSearchResults(results);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const run = async () => {
+      const q = searchQuery.trim();
+
+      if (!q) {
+        setSearchResults([]);
         setIsSearching(false);
-      }, 300);
-    } else {
-      setSearchResults([]);
-    }
+        return;
+      }
+
+      setIsSearching(true);
+
+      try {
+        const results = await onSearch(q);
+        if (!cancelled) setSearchResults(results);
+      } catch (err) {
+        if (!cancelled) setSearchResults([]);
+        // optional: console.error(err);
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    };
+
+    // ✅ Debounce so we don't call geocode on every keystroke
+    timer = setTimeout(run, 300);
+
+    // cleanup
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [searchQuery, onSearch]);
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-  };
+  const handleSearch = (query: string) => setSearchQuery(query);
 
-  const getAvailabilityPercentage = (lot: ParkingLot) => {
-    return Math.round(((lot.capacity - lot.occupied) / lot.capacity) * 100);
+  const getAvailabilityPercentage = (lot: ParkingLot) =>
+    Math.round(((lot.capacity - lot.occupied) / lot.capacity) * 100);
+
+  const formatKm = (km?: number) => {
+    if (km === undefined || km === null) return null;
+    if (!Number.isFinite(km)) return null;
+    return km < 10 ? km.toFixed(1) : km.toFixed(0);
   };
 
   return (
@@ -51,20 +85,22 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
             className="pl-10"
           />
         </div>
-        
+
         {!searchQuery && (
           <div className="mt-3 text-xs text-muted-foreground">
             <p className="mb-1">Find nearest parking by address:</p>
             <div className="flex flex-wrap gap-1">
-              {['819 Dynes Rd', 'Parliament Hill', 'University of Ottawa', 'Rideau Centre', 'Lansdowne Park'].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => handleSearch(suggestion)}
-                  className="px-2 py-1 bg-muted rounded-md hover:bg-muted/80 transition-colors"
-                >
-                  {suggestion}
-                </button>
-              ))}
+              {['819 Dynes Rd', 'Parliament Hill', 'University of Ottawa', 'Rideau Centre', 'Lansdowne Park'].map(
+                (suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => handleSearch(suggestion)}
+                    className="px-2 py-1 bg-muted rounded-md hover:bg-muted/80 transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                )
+              )}
             </div>
           </div>
         )}
@@ -89,18 +125,17 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Found {searchResults.length} parking location{searchResults.length !== 1 ? 's' : ''}
-            {searchResults[0]?.distanceKm && (
-              <span className="ml-2 font-medium">
-                • Sorted by distance from your location
-              </span>
+            {searchResults[0]?.distanceKm !== undefined && (
+              <span className="ml-2 font-medium">• Sorted by distance</span>
             )}
           </p>
-          
+
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             {searchResults.map((lot) => {
               const availableSpots = lot.capacity - lot.occupied;
               const availabilityPercentage = getAvailabilityPercentage(lot);
               const StatusIcon = lot.status === 'available' ? CheckCircle : AlertTriangle;
+              const kmText = formatKm(lot.distanceKm);
 
               return (
                 <Card key={lot.id} className="p-4 hover:shadow-md transition-shadow">
@@ -108,21 +143,23 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold truncate">{lot.name}</h3>
-                        <Badge 
+
+                        <Badge
                           variant={lot.status === 'available' ? 'default' : 'destructive'}
                           className={`gap-1 ${lot.status === 'available' ? 'status-available' : 'status-busy'}`}
                         >
                           <StatusIcon className="h-3 w-3" />
                           {lot.status === 'available' ? 'Available' : 'Busy'}
                         </Badge>
-                        {lot.distanceKm && (
+
+                        {kmText && (
                           <Badge variant="outline" className="gap-1 text-xs">
                             <MapPin className="h-3 w-3" />
-                            {lot.distanceKm} km
+                            {kmText} km
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                         <MapPin className="h-3 w-3" />
                         <span className="truncate">{lot.address}</span>
@@ -146,10 +183,7 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
                       {lot.amenities && lot.amenities.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
                           {lot.amenities.slice(0, 4).map((amenity, index) => (
-                            <span 
-                              key={index} 
-                              className="text-xs px-2 py-1 bg-muted rounded-md"
-                            >
+                            <span key={index} className="text-xs px-2 py-1 bg-muted rounded-md">
                               {amenity}
                             </span>
                           ))}
@@ -163,12 +197,8 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
                     </div>
 
                     <div className="text-center ml-4">
-                      <div className="text-lg font-bold mb-1">
-                        {availabilityPercentage}%
-                      </div>
-                      <div className="text-xs text-muted-foreground mb-1">
-                        available
-                      </div>
+                      <div className="text-lg font-bold mb-1">{availabilityPercentage}%</div>
+                      <div className="text-xs text-muted-foreground mb-1">available</div>
                       <div className="text-sm">
                         {availableSpots} / {lot.capacity}
                       </div>
@@ -176,19 +206,10 @@ export const SearchResults = ({ onSearch, onLotSelect, onNavigate }: SearchResul
                   </div>
 
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onLotSelect(lot.id)}
-                      className="flex-1"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => onLotSelect(lot.id)} className="flex-1">
                       View Details
                     </Button>
-                    <Button 
-                      size="sm"
-                      onClick={() => onNavigate(lot)}
-                      className="gap-2"
-                    >
+                    <Button size="sm" onClick={() => onNavigate(lot)} className="gap-2">
                       <Navigation className="h-3 w-3" />
                       Navigate
                     </Button>
