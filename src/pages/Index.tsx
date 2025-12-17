@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useParkingData } from '@/hooks/useParkingData';
 import { openGoogleMapsNavigation } from '@/utils/navigation';
 import { ParkingHeader } from '@/components/parking/ParkingHeader';
@@ -11,6 +11,7 @@ import { SearchResults } from '@/components/parking/SearchResults';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import AIChat from '@/components/AIChat';
+import ParkingCards from '@/components/parking/ParkingCards';
 
 const Index = () => {
   const {
@@ -70,10 +71,11 @@ const Index = () => {
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="overview">Parking Overview</TabsTrigger>
             <TabsTrigger value="search">Search Locations</TabsTrigger>
-          </TabsList>
+            <TabsTrigger value="cards">Cards</TabsTrigger>
+</TabsList>
 
           <TabsContent value="overview" className="space-y-0">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -87,7 +89,7 @@ const Index = () => {
                         className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors flex items-center gap-2"
                         aria-label="Back to overview"
                       >
-                        ← Back to Overview
+                        â† Back to Overview
                       </button>
                     </div>
                     <ParkingLotDetailMap lot={selectedLot} />
@@ -131,6 +133,19 @@ const Index = () => {
               onNavigate={handleNavigate}
             />
           </TabsContent>
+          <TabsContent value="cards" className="space-y-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <ParkingCards
+                  lots={lots}
+                  selectedLotId={selectedLotId}
+                  onSelect={selectLot}
+                  onNavigate={handleNavigate}
+                />
+              </div>
+              
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -138,16 +153,23 @@ const Index = () => {
       <footer className="fixed bottom-0 left-0 right-0 glass-effect border-t z-40">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div>Live parking data • Colorblind-safe (✓/✗ + green/red)</div>
-            <div>© Ottawa Live Parking</div>
+            <div>Live parking data â€¢ Colorblind-safe (âœ“/âœ— + green/red)</div>
+            <div>Â© Ottawa Live Parking</div>
           </div>
         </div>
       </footer>
 
-      {/* AI Chat – the component includes its own floating trigger/button */}
+      {/* AI Chat â€“ the component includes its own floating trigger/button */}
       <AIChat />
     </div>
   );
 };
 
 export default Index;
+
+
+
+
+
+
+

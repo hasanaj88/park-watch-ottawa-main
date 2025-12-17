@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -131,7 +131,7 @@ export default function AIChat() {
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+    <Sheet modal={false} open={isOpen} onOpenChange={setIsOpen}>
       {/* Floating chat button */}
       <SheetTrigger asChild>
         <Button
@@ -152,7 +152,7 @@ export default function AIChat() {
       {/* Chat drawer */}
       <SheetContent
         side="right"
-        className="w-full sm:w-[400px] p-0 flex flex-col z-[10000]"
+        className="w-[400px] max-w-[90vw] p-0 flex flex-col z-[10000]"
       >
         <SheetHeader className="p-4 border-b">
           <SheetTitle>Parking Assistant</SheetTitle>
@@ -215,3 +215,6 @@ export default function AIChat() {
     </Sheet>
   );
 }
+
+
+

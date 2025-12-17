@@ -54,3 +54,14 @@ Thumbs.db
 *.tmp
 *.bak
 uui.txt
+# node
+node_modules/
+
+# server
+server/node_modules/
+server/.env
+server/.env.*
+
+# build
+dist/
+.vercel/
