@@ -65,3 +65,4 @@ server/.env.*
 # build
 dist/
 .vercel/
+.vercel
