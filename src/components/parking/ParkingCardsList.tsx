@@ -21,6 +21,9 @@ export default function ParkingCardsList({
   onCardClick,
 }: Props) {
   const safeLots = Array.isArray(lots) ? lots : [];
+  console.log("LOTS PROP:", lots);
+  console.log("SAFE LOTS LENGTH:", safeLots.length);
+  console.log("FIRST LOT:", safeLots[0]);
 
   const visibleLots = useMemo(() => {
     const cleaned = safeLots.filter(isParkingLot);
@@ -61,14 +64,16 @@ export default function ParkingCardsList({
   }
 
   return (
-  <div className="rounded-2xl p-6
-    bg-gradient-to-br
-    from-slate-800/80
-    via-slate-900/70
-    to-emerald-900/40
-    backdrop-blur-md border border-white/10 shadow-xl">
+  <div className="
+  rounded-2xl p-6
+  bg-white/60 dark:bg-gradient-to-br
+  dark:from-slate-800/80 dark:via-slate-900/70 dark:to-emerald-900/40
+  backdrop-blur-md
+  border border-black/10 dark:border-white/10
+  shadow-xl
+">
 
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {visibleLots.map((lot) => (
         <ParkingCard
           key={String(lot.id ?? lot.name ?? `${lot.status}-${Math.random()}`)}

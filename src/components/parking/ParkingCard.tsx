@@ -119,9 +119,10 @@ export default function ParkingCard({ lot, onClick }: Props) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className={`text-lg leading-none ${theme.dot}`}>●</span>
-            <h3 className="truncate text-base font-semibold text-foreground">
-              {name}
-            </h3>
+            <h3 className="text-base font-semibold text-foreground line-clamp-3">
+            {name}
+             </h3>
+
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

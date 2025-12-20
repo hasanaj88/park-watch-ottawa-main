@@ -52,11 +52,22 @@ const Index = () => {
   };
 
   const cardsLots: ParkingLot[] = useMemo(() => {
-    const base = (lots?.length ? lots : allLots) ?? [];
-    return base as ParkingLot[];
-  }, [lots, allLots]);
+  const base = (lots?.length ? lots : allLots) ?? [];
+  return base.map((lot: any) => ({
+    id: lot.id,
+    name: lot.name,
+    status: lot.status,
+    free: Math.max(0, (lot.capacity ?? 0) - (lot.occupied ?? 0)),
+    total: lot.capacity ?? 0,
+    conf: Math.round((lot.confidence ?? 0) * 100),
+  }));
+}, [lots, allLots]);
 
-  const availableOnly = Boolean((filters as any)?.availableOnly);
+
+
+
+  const availableOnly = Boolean((filters as any)?.onlyAvailable);
+
 
   const handleCardClick = (lot: ParkingLot) => {
     if (!lot?.id) return;

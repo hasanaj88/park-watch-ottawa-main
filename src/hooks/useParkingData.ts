@@ -32,7 +32,7 @@ const normalizeQueryToWords = (q: string) => {
 export const useParkingData = () => {
   const [lotsState, setLotsState] = useState<ParkingLot[]>(EXTENDED_PARKING_LOTS);
 
-  // ✅ IMPORTANT: start with no selected lot
+  //  IMPORTANT: start with no selected lot
   const [selectedLotId, setSelectedLotId] = useState<string>('');
 
   const [filters, setFilters] = useState<ParkingFilters>({
