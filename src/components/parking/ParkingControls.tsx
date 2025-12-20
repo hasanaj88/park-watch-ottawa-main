@@ -7,7 +7,8 @@ import type { ParkingFilters } from "@/types/parking";
 
 type ParkingControlsProps = {
   filters: ParkingFilters;
-  onFiltersChange: (filters: Partial<ParkingFilters>) => void;
+  onFiltersChange: (newFilters: Partial<ParkingFilters>) => void;
+  onSearch?: () => void; // add this
 };
 
 export const ParkingControls = ({ filters, onFiltersChange }: ParkingControlsProps) => {

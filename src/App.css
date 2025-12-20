@@ -1,42 +1,91 @@
+/* ===== Reset / base ===== */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0b1220; /* قريب من خلفيتك الداكنة */
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: #e5e7eb;
+}
+
+/* مهم: لا تجعل كل شيء وسط */
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
-  text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* ===== Page layout ===== */
+.page {
+  width: 100%;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.page-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  text-align: left; /* خليها left للـ cards */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.card {
-  padding: 2em;
+/* ===== Parking Card ===== */
+.parking-card {
+  cursor: pointer;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #1f2937;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-.read-the-docs {
-  color: #888;
+.parking-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.parking-card:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.parking-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+
+.parking-meta {
+  opacity: 0.85;
+  margin-bottom: 8px;
+}
+
+.parking-status {
+  font-weight: 600;
+}
+
+/* statuses */
+.parking-status.available {
+  color: #22c55e;
+}
+
+.parking-status.busy {
+  color: #ef4444;
+}
+
+/* ===== Dashboard ===== */
+.dashboard-box {
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.muted {
+  opacity: 0.7;
 }

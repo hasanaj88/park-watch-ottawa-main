@@ -8,24 +8,16 @@ import {
   parsePostalCodeToCoordinates,
   isPostalCode
 } from '@/utils/distance';
-import { geocodeOttawa } from "@/utils/geocode";
+import { geocodeOttawa } from '@/utils/geocode';
 
-/** Words that should NOT narrow results (user typed generic query like "parking lots") */
 const STOPWORDS = new Set([
-  'parking', 'park',
-  'lot', 'lots',
-  'garage', 'garages',
-  'parkade', 'parkades',
-  'location', 'locations',
-  'spot', 'spots',
-  'near', 'nearest', 'find', 'show', 'me'
+  'parking', 'park', 'lot', 'lots', 'garage', 'garages', 'parkade', 'parkades',
+  'location', 'locations', 'spot', 'spots', 'near', 'nearest', 'find', 'show', 'me'
 ]);
 
-/** Basic normalization: lowercase + trim + singularize simple plurals */
 const normalizeWord = (w: string) => {
   const x = w.toLowerCase().trim();
   if (!x) return '';
-  // simple plural handling: lots -> lot, garages -> garage
   if (x.length > 3 && x.endsWith('s')) return x.slice(0, -1);
   return x;
 };
@@ -38,8 +30,11 @@ const normalizeQueryToWords = (q: string) => {
 };
 
 export const useParkingData = () => {
-  const [lots, setLots] = useState<ParkingLot[]>(EXTENDED_PARKING_LOTS);
-  const [selectedLotId, setSelectedLotId] = useState<string>(EXTENDED_PARKING_LOTS[0]?.id ?? '');
+  const [lotsState, setLotsState] = useState<ParkingLot[]>(EXTENDED_PARKING_LOTS);
+
+  // ✅ IMPORTANT: start with no selected lot
+  const [selectedLotId, setSelectedLotId] = useState<string>('');
+
   const [filters, setFilters] = useState<ParkingFilters>({
     query: '',
     onlyAvailable: false,
@@ -49,13 +44,12 @@ export const useParkingData = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Simulate random data updates to mimic live camera data
   const updateLotData = useCallback((lot: ParkingLot): ParkingLot => {
-    const occupancyChange = Math.floor(Math.random() * 20) - 10; // ±10
+    const occupancyChange = Math.floor(Math.random() * 20) - 10;
     const newOccupied = Math.max(0, Math.min(lot.capacity, lot.occupied + occupancyChange));
     const availableRatio = (lot.capacity - newOccupied) / lot.capacity;
     const newStatus = availableRatio < 0.15 ? 'busy' : 'available';
-    const confidenceChange = (Math.random() - 0.5) * 0.1; // ±5%
+    const confidenceChange = (Math.random() - 0.5) * 0.1;
     const newConfidence = Math.max(0.4, Math.min(0.99, lot.confidence + confidenceChange));
 
     return {
@@ -67,11 +61,10 @@ export const useParkingData = () => {
     };
   }, []);
 
-  // Simulate live data refresh
   const refreshData = useCallback(() => {
     setIsLoading(true);
     setTimeout(() => {
-      setLots(prev => prev.map(updateLotData));
+      setLotsState(prev => prev.map(updateLotData));
       setIsLoading(false);
       toast({
         title: 'Data Refreshed',
@@ -81,24 +74,21 @@ export const useParkingData = () => {
     }, 1000);
   }, [updateLotData, toast]);
 
-  // Auto-refresh based on interval
   useEffect(() => {
     const interval = setInterval(refreshData, filters.refreshInterval * 1000);
     return () => clearInterval(interval);
   }, [refreshData, filters.refreshInterval]);
 
-  // Filter lots based on current filters (local search)
   const { searchTerm: filterTerm, meaningfulWords: filterWords } = useMemo(
     () => normalizeQueryToWords(filters.query),
     [filters.query]
   );
 
   const filteredLots = useMemo(() => {
-    return lots.filter(lot => {
+    return lotsState.filter(lot => {
       if (filters.onlyAvailable && lot.status !== 'available') return false;
 
       if (filterTerm) {
-        // If user typed only generic words like "parking lots", don't filter anything
         if (filterWords.length === 0) return true;
 
         const searchableText = [
@@ -107,35 +97,39 @@ export const useParkingData = () => {
           ...(lot.amenities || [])
         ].join(' ').toLowerCase();
 
-        // require all meaningful words
         return filterWords.every(w => searchableText.includes(w));
       }
 
       return true;
     });
-  }, [lots, filters.onlyAvailable, filterTerm, filterWords]);
+  }, [lotsState, filters.onlyAvailable, filterTerm, filterWords]);
 
-  // Safer selected lot
-  const selectedLot = lots.find(lot => lot.id === selectedLotId) ?? lots[0] ?? null;
+  // ✅ Selected lot: null if no id
+  const selectedLot = useMemo(() => {
+    if (!selectedLotId) return null;
+    return lotsState.find(lot => lot.id === selectedLotId) ?? null;
+  }, [lotsState, selectedLotId]);
 
   const updateFilters = (newFilters: Partial<ParkingFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   };
 
   const selectLot = (lotId: string) => {
-    setSelectedLotId(lotId);
+    setSelectedLotId(lotId ? String(lotId) : '');
+  };
+
+  const clearSelectedLot = () => {
+    setSelectedLotId('');
   };
 
   const getAvailabilityPercentage = (lot: ParkingLot) => {
     return Math.round(((lot.capacity - lot.occupied) / lot.capacity) * 100);
   };
 
-  // Location-style search (address/postal/distance). Uses LIVE lots now.
   const searchLots = async (input: string) => {
     if (!input.trim()) return [];
 
     const { searchTerm, meaningfulWords } = normalizeQueryToWords(input);
-
     const addressCoords = parseAddressToCoordinates(searchTerm);
 
     let postalCoords: { lat: number; lng: number } | null = null;
@@ -145,12 +139,12 @@ export const useParkingData = () => {
     }
 
     if (meaningfulWords.length === 0 && !addressCoords && !postalCoords) {
-      return [...lots].sort(
+      return [...lotsState].sort(
         (a, b) => (b.capacity - b.occupied) - (a.capacity - a.occupied)
       );
     }
 
-    let results = lots.filter(lot => {
+    let results = lotsState.filter(lot => {
       const searchableText = [
         lot.name,
         lot.address ?? '',
@@ -194,12 +188,11 @@ export const useParkingData = () => {
         .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
     }
 
-    // ✅ Better: geocode even if there are only a few weak matches
     if (results.length <= 2) {
       const geo = await geocodeOttawa(input);
       if (geo.found) {
         const coords = { lat: geo.lat, lng: geo.lng };
-        return [...lots]
+        return [...lotsState]
           .map(lot => ({
             ...lot,
             distanceKm: calculateDistance(
@@ -227,13 +220,18 @@ export const useParkingData = () => {
 
   return {
     lots: filteredLots,
-    allLots: lots,
+    allLots: lotsState,
+
     selectedLot,
     selectedLotId,
+
     filters,
     isLoading,
+
     updateFilters,
     selectLot,
+    clearSelectedLot,
+
     refreshData,
     getAvailabilityPercentage,
     searchLots

@@ -36,7 +36,7 @@
     --parking-busy: 0 84% 60%;
     --parking-ring: 158 64% 52%;
     --parking-muted: 215.4 16.3% 46.9%;
-    
+
     /* Glassmorphism effects */
     --glass-bg: 0 0% 100% / 0.8;
     --glass-border: 220 13% 91% / 0.2;
@@ -44,7 +44,7 @@
   }
 
   .dark {
-    /* Dark theme - matching your original design */
+    /* Dark theme */
     --background: 221 39% 11%;
     --foreground: 210 40% 98%;
     --card: 220 13% 18%;
@@ -65,7 +65,7 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 158 64% 52%;
 
-    /* Dark parking-specific colors - matching your original */
+    /* Parking-specific */
     --parking-bg: 221 39% 11%;
     --parking-card: 220 13% 18%;
     --parking-border: 217.2 32.6% 17.5%;
@@ -73,10 +73,21 @@
     --parking-busy: 0 84% 60%;
     --parking-ring: 158 64% 52%;
     --parking-muted: 215 20.2% 65.1%;
-    
-    /* Dark glassmorphism */
+
+    /* Dark glass */
     --glass-bg: 220 13% 18% / 0.6;
     --glass-border: 217.2 32.6% 17.5% / 0.2;
+  }
+
+  /* Base page */
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* IMPORTANT: Don't apply border to all elements.
+     Only unify border COLOR globally (safe) */
+  * {
+    border-color: hsl(var(--border));
   }
 
   /* Parking status indicators */
@@ -100,22 +111,22 @@
     background-color: hsl(var(--parking-busy));
   }
 
-  /* Glassmorphism utilities */
+  /* Glassmorphism */
   .glass-effect {
     background: hsl(var(--glass-bg));
     backdrop-filter: var(--backdrop-blur);
     border: 1px solid hsl(var(--glass-border));
   }
 
-  /* Grid background pattern */
+  /* Grid pattern */
   .grid-pattern {
-    background-image: 
+    background-image:
       linear-gradient(0deg, transparent 24px, hsl(var(--border) / 0.3) 25px),
       linear-gradient(90deg, transparent 24px, hsl(var(--border) / 0.3) 25px);
     background-size: 25px 25px;
   }
 
-  /* Parking map pins layout */
+  /* Parking pins grid */
   .parking-pins-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
@@ -123,14 +134,42 @@
     gap: 0.5rem;
     padding: 0.75rem;
   }
+
+  /* Procedural motion background */
+  .app-parking-bg {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(1400px 800px at 15% 0%, rgba(59,130,246,0.7), transparent 80%),
+    radial-gradient(1200px 800px at 85% 25%, rgba(16,185,129,0.7), transparent 80%),
+    radial-gradient(1000px 800px at 50% 120%, rgba(0,0,0,0.7), transparent 80%),
+    linear-gradient(180deg, #eef2f7 0%, #dbe3ef 100%);
 }
 
-@layer base {
-  * {
-    @apply border-border;
+  .app-parking-bg::before {
+    content: "";
+    position: fixed;
+    inset: -35%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.28;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.02) 0px, rgba(0,0,0,0.02) 1px, transparent 1px, transparent 4px),
+      repeating-linear-gradient(35deg, rgba(0,0,0,0.018) 0px, rgba(0,0,0,0.018) 1px, transparent 1px, transparent 10px);
+    filter: blur(0.25px);
   }
 
-  body {
-    @apply bg-background text-foreground;
+  .app-content {
+    position: relative;
+    z-index: 2;
+  }
+
+  .dark .app-parking-bg {
+    background:
+      radial-gradient(1200px 700px at 15% 0%, rgba(56, 189, 248, 0.08), transparent 55%),
+      radial-gradient(900px 600px at 85% 20%, rgba(34, 197, 94, 0.06), transparent 55%),
+      radial-gradient(900px 700px at 50% 110%, rgba(255, 255, 255, 0.03), transparent 60%),
+      linear-gradient(180deg, #0a1220 0%, #05070c 100%);
   }
 }
