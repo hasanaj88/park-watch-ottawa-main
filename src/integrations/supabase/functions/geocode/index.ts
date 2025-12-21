@@ -3,19 +3,30 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*", // Allow from anywhere
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
+      ...corsHeaders,
       "Content-Type": "application/json",
-      // Nominatim is picky about User-Agent/Referer; edge env is fine,
-      // but we also set cache headers for safety.
       "Cache-Control": "no-store",
     },
   });
 }
 
 Deno.serve(async (req) => {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
+
   if (req.method !== "POST") return json({ error: "Use POST" }, 405);
 
   try {
@@ -24,7 +35,6 @@ Deno.serve(async (req) => {
 
     if (!query) return json({ error: "Missing q" }, 400);
 
-    // Bias results toward Ottawa
     const params = new URLSearchParams({
       q: `${query}, Ottawa, Ontario, Canada`,
       format: "json",
@@ -36,9 +46,9 @@ Deno.serve(async (req) => {
 
     const res = await fetch(url, {
       headers: {
-        // Required by Nominatim usage policy (identify your app)
-        "User-Agent": "OttawaLiveParking/1.0 (contact: admin@ottawaliveparking.ca)",
-        "Accept": "application/json",
+        "User-Agent":
+          "OttawaLiveParking/1.0 (contact: admin@ottawaliveparking.ca)",
+        Accept: "application/json",
       },
     });
 

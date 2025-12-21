@@ -1,5 +1,10 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ParkingCard, { ParkingLot } from "./ParkingCard";
+
+import { buildAllSummaries } from "@/lib/traffic/trafficSummary";
+import type { Camera, TrafficEvent } from "@/lib/traffic/trafficSummary";
+
+import { getAllParkingData } from "@/services/trafficDataProvider";
 
 type Props = {
   lots?: ParkingLot[];
@@ -9,9 +14,8 @@ type Props = {
   onCardClick?: (lot: ParkingLot) => void;
 };
 
-const isParkingLot = (
-  x: ParkingLot | undefined | null
-): x is ParkingLot => Boolean(x);
+const isParkingLot = (x: ParkingLot | undefined | null): x is ParkingLot =>
+  Boolean(x);
 
 export default function ParkingCardsList({
   lots,
@@ -20,70 +24,75 @@ export default function ParkingCardsList({
   availableOnly = false,
   onCardClick,
 }: Props) {
-  const safeLots = Array.isArray(lots) ? lots : [];
-  console.log("LOTS PROP:", lots);
-  console.log("SAFE LOTS LENGTH:", safeLots.length);
-  console.log("FIRST LOT:", safeLots[0]);
+  const [localLots, setLocalLots] = useState<ParkingLot[]>([]);
+  const [cameras, setCameras] = useState<Camera[]>([]);
+  const [events, setEvents] = useState<TrafficEvent[]>([]);
+  const [trafficError, setTrafficError] = useState<unknown>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadAll() {
+      try {
+        const data = await getAllParkingData();
+        if (!alive) return;
+
+        setLocalLots(Array.isArray(data.lots) ? data.lots : []);
+        setCameras(Array.isArray(data.cameras) ? data.cameras : []);
+        setEvents(Array.isArray(data.events) ? data.events : []);
+      } catch (e) {
+        if (!alive) return;
+        setTrafficError(e);
+        console.error("Failed to load parking or traffic data", e);
+      }
+    }
+
+    loadAll();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const safeLots = useMemo(() => {
+    const source =
+      Array.isArray(lots) && lots.length > 0 ? lots : localLots;
+    return source.filter(isParkingLot);
+  }, [lots, localLots]);
+
+  const summariesByLotId = useMemo(() => {
+    return buildAllSummaries(
+      Array.isArray(cameras) ? cameras : [],
+      Array.isArray(events) ? events : []
+    );
+  }, [cameras, events]);
 
   const visibleLots = useMemo(() => {
-    const cleaned = safeLots.filter(isParkingLot);
+    if (!availableOnly) return safeLots;
 
-    if (!availableOnly) return cleaned;
-
-    return cleaned.filter(
-      (l) => String(l.status ?? "").toLowerCase() === "available"
-    );
+    return safeLots.filter((lot) => {
+      const free = lot.free ?? lot.available ?? 0;
+      return free > 0;
+    });
   }, [safeLots, availableOnly]);
 
-  if (isLoading) {
-    return (
-      <div className="text-white/70 text-sm">Loading parking locations...</div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-red-400 text-sm">
-        Failed to load parking locations.
-      </div>
-    );
-  }
-
-  if (safeLots.length === 0) {
-    return (
-      <div className="text-white/60 text-sm">No parking locations found.</div>
-    );
-  }
-
-  if (availableOnly && visibleLots.length === 0) {
-    return (
-      <div className="text-white/60 text-sm">
-        No available parking right now (filter is ON).
-      </div>
-    );
-  }
-
   return (
-  <div className="
-  rounded-2xl p-6
-  bg-white/60 dark:bg-gradient-to-br
-  dark:from-slate-800/80 dark:via-slate-900/70 dark:to-emerald-900/40
-  backdrop-blur-md
-  border border-black/10 dark:border-white/10
-  shadow-xl
-">
-
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div
+      className="
+        grid gap-4
+        grid-cols-1
+        sm:grid-cols-2
+        lg:grid-cols-3
+      "
+    >
       {visibleLots.map((lot) => (
         <ParkingCard
-          key={String(lot.id ?? lot.name ?? `${lot.status}-${Math.random()}`)}
+          key={String(lot.id)}
           lot={lot}
-          onClick={onCardClick}
+          trafficSummary={summariesByLotId[String(lot.id)]}
+          onClick={() => onCardClick?.(lot)}
         />
       ))}
     </div>
-
-  </div>
-);
+  );
 }
 

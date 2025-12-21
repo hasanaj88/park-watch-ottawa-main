@@ -1,15 +1,42 @@
 ﻿export type ParkingLot = {
-  id?: string | number;
+  id: string | number; // unique identifier (Supabase uuid = string)
+
   name?: string;
+
+  // primary fields you currently use
   free?: number;
   total?: number;
+
+  // optional alt naming (sometimes APIs use these)
+  available?: number;
+  capacity?: number;
+
+  // confidence + status
   conf?: number;
   status?: string;
+
+  //  for Supabase fields (Option 1 table has lat/lng)
+  lat?: number;
+  lng?: number;
+
+  //  if you prefer nested coords (your parkingApi currently returns coordinates)
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+};
+
+export type TrafficSummary = {
+  nearbyCameraCount: number;
+  nearbyEventCount: number;
+  disruptionScore: number; // 0..100
+  maxPriority: "HIGH" | "MEDIUM" | "LOW" | "NONE";
 };
 
 type Props = {
   lot?: ParkingLot;
   onClick?: (lot: ParkingLot) => void;
+  trafficSummary?: TrafficSummary;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -20,16 +47,20 @@ function normalizeStatus(status?: string) {
   return String(status ?? "").trim().toLowerCase();
 }
 
-export default function ParkingCard({ lot, onClick }: Props) {
+function trafficLabel(score: number) {
+  if (score >= 70) return "High";
+  if (score >= 40) return "Medium";
+  return "Low";
+}
+
+export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
   if (!lot) return null;
 
-  const {
-    name = "Unknown Parking",
-    free = 0,
-    total = 0,
-    conf = 0,
-    status = "unknown",
-  } = lot;
+  const { name = "Unknown Parking", conf = 0, status = "unknown" } = lot;
+
+  //  Support both naming styles safely
+  const free = lot.free ?? lot.available ?? 0;
+  const total = lot.total ?? lot.capacity ?? 0;
 
   const s = normalizeStatus(status);
 
@@ -93,6 +124,13 @@ export default function ParkingCard({ lot, onClick }: Props) {
 
   const handleClick = () => onClick?.(lot);
 
+  // Traffic info (safe defaults)
+  const cameraCount = trafficSummary?.nearbyCameraCount ?? 0;
+  const eventCount = trafficSummary?.nearbyEventCount ?? 0;
+  const trafficScore = trafficSummary?.disruptionScore ?? 0;
+  const priority = trafficSummary?.maxPriority ?? "NONE";
+  const trafficLevel = trafficLabel(trafficScore);
+
   return (
     <div
       role="button"
@@ -107,6 +145,9 @@ export default function ParkingCard({ lot, onClick }: Props) {
         "border border-border",
         "focus:outline-none focus:ring-2 focus:ring-ring",
         "ring-1",
+        "w-full min-w-0 sm:min-w-[260px] lg:min-w-0",
+        "max-w-full",
+        "flex flex-col",
         theme.ring,
       ].join(" ")}
     >
@@ -119,10 +160,18 @@ export default function ParkingCard({ lot, onClick }: Props) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className={`text-lg leading-none ${theme.dot}`}>●</span>
-            <h3 className="text-base font-semibold text-foreground line-clamp-3">
-            {name}
-             </h3>
 
+            <h3
+              className="
+                text-base font-semibold text-foreground
+                line-clamp-2
+                whitespace-normal
+                break-words
+                min-h-[2.5rem]
+              "
+            >
+              {name}
+            </h3>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -161,8 +210,40 @@ export default function ParkingCard({ lot, onClick }: Props) {
         </div>
 
         <div className="h-2 w-full overflow-hidden rounded-full bg-black/10 ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/10">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%` }}>
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          >
             <div className={`h-full w-full ${theme.bar}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Traffic Context Block */}
+      <div className="relative mt-4 rounded-xl bg-black/5 p-3 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>Traffic context</span>
+          <span className="font-semibold text-foreground/80">
+            {trafficLevel} · {trafficScore}/100
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+          <div className="rounded-lg bg-white/40 px-2 py-1 ring-1 ring-black/5 dark:bg-black/20 dark:ring-white/10">
+            <div className="opacity-70">Cameras</div>
+            <div className="font-semibold text-foreground">{cameraCount}</div>
+          </div>
+
+          <div className="rounded-lg bg-white/40 px-2 py-1 ring-1 ring-black/5 dark:bg-black/20 dark:ring-white/10">
+            <div className="opacity-70">Incidents</div>
+            <div className="font-semibold text-foreground">{eventCount}</div>
+          </div>
+
+          <div className="rounded-lg bg-white/40 px-2 py-1 ring-1 ring-black/5 dark:bg-black/20 dark:ring-white/10">
+            <div className="opacity-70">Priority</div>
+            <div className="font-semibold text-foreground">
+              {priority === "NONE" ? "—" : priority}
+            </div>
           </div>
         </div>
       </div>
