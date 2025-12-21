@@ -40,6 +40,7 @@ export default function ParkingCardsList({
         setLocalLots(Array.isArray(data.lots) ? data.lots : []);
         setCameras(Array.isArray(data.cameras) ? data.cameras : []);
         setEvents(Array.isArray(data.events) ? data.events : []);
+        setTrafficError(null);
       } catch (e) {
         if (!alive) return;
         setTrafficError(e);
@@ -54,16 +55,20 @@ export default function ParkingCardsList({
   }, []);
 
   const safeLots = useMemo(() => {
-    const source =
-      Array.isArray(lots) && lots.length > 0 ? lots : localLots;
+    const source = Array.isArray(lots) && lots.length > 0 ? lots : localLots;
     return source.filter(isParkingLot);
   }, [lots, localLots]);
 
   const summariesByLotId = useMemo(() => {
-    return buildAllSummaries(
-      Array.isArray(cameras) ? cameras : [],
-      Array.isArray(events) ? events : []
-    );
+    try {
+      return buildAllSummaries(
+        Array.isArray(cameras) ? cameras : [],
+        Array.isArray(events) ? events : []
+      );
+    } catch (e) {
+      console.error("Failed to build traffic summaries", e);
+      return {} as Record<string, any>;
+    }
   }, [cameras, events]);
 
   const visibleLots = useMemo(() => {
@@ -74,6 +79,30 @@ export default function ParkingCardsList({
       return free > 0;
     });
   }, [safeLots, availableOnly]);
+
+  if (isLoading) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Loading parking cards…
+      </div>
+    );
+  }
+
+  if (error || trafficError) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Could not load cards right now.
+      </div>
+    );
+  }
+
+  if (!visibleLots.length) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        No parking lots to display.
+      </div>
+    );
+  }
 
   return (
     <div
@@ -88,11 +117,10 @@ export default function ParkingCardsList({
         <ParkingCard
           key={String(lot.id)}
           lot={lot}
-          trafficSummary={summariesByLotId[String(lot.id)]}
+          trafficSummary={summariesByLotId[String(lot.id)] ?? undefined}
           onClick={() => onCardClick?.(lot)}
         />
       ))}
     </div>
   );
 }
-

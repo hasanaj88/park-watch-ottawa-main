@@ -178,8 +178,7 @@ const Index = () => {
         <footer className="fixed bottom-0 left-0 right-0 glass-effect border-t z-40">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div>Live parking data • Colorblind-safe (✓/✗ + green/red)</div>
-              <div>© Ottawa Live Parking</div>
+              <div>© Ottawa Live Parking 2025</div>
             </div>
           </div>
         </footer>
