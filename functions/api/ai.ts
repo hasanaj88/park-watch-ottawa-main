@@ -1,48 +1,59 @@
-export const onRequestPost: PagesFunction<{ AI: any }> = async ({ request, env }) => {
+type Role = "system" | "user" | "assistant";
+
+type ChatMessage = {
+  role: Role;
+  content: string;
+};
+
+export const onRequestPost: PagesFunction<{ AI: any }> = async ({
+  request,
+  env,
+}) => {
   const body = await request.json().catch(() => ({}));
 
-  //  { message } or { messages: [...] }
-  const messagesInput = Array.isArray(body?.messages) ? body.messages : null;
-  const singleMessage = typeof body?.message === "string" ? body.message : "";
-
-  const system = {
-    role: "system",
-    content:
-      "You are Ottawa Live Parking Assistant. Help users with parking in Ottawa. Be concise, practical, and safety-aware. If unsure, say so.",
-  };
-
-  const chatHistory = messagesInput
-    ? messagesInput
+  const messagesInput: ChatMessage[] | null = Array.isArray(body?.messages)
+    ? body.messages
         .filter(
           (m: any) =>
             m &&
-            (m.role === "user" || m.role === "assistant") &&
+            (m.role === "system" || m.role === "user" || m.role === "assistant") &&
             typeof m.content === "string"
         )
-        .map((m: any) => ({ role: m.role, content: m.content }))
-    : singleMessage
-      ? [{ role: "user", content: singleMessage }]
-      : [];
+        .map((m: any) => ({ role: m.role as Role, content: String(m.content) }))
+    : null;
 
-  if (chatHistory.length === 0) {
+  const singleMessage =
+    typeof body?.message === "string" ? String(body.message) : "";
+
+  if (!messagesInput && !singleMessage.trim()) {
     return new Response(JSON.stringify({ reply: "Please send a message." }), {
       headers: { "Content-Type": "application/json" },
       status: 400,
     });
   }
 
-  // prompt (llama instruct)
+  const systemDefault: ChatMessage = {
+    role: "system",
+    content:
+      "You are Ottawa Live Parking Assistant. Help users with parking in Ottawa. Be concise, practical, and safety-aware. If unsure, say so.",
+  };
+
+  const chatMessages: ChatMessage[] = messagesInput
+    ? messagesInput
+    : [systemDefault, { role: "user", content: singleMessage.trim() }];
+
   const prompt =
-    [system, ...chatHistory]
-      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-      .join("\n") + "\nASSISTANT:";
+    chatMessages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join("\n") +
+    "\nASSISTANT:";
 
   const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", { prompt });
 
-  const reply = (result?.response ?? result?.result ?? "").toString().trim();
+  const reply = String(result?.response ?? result?.result ?? "").trim();
 
   return new Response(
-    JSON.stringify({ reply: reply || "Sorry, I couldn't generate a response." }),
+    JSON.stringify({
+      reply: reply || "Sorry, I couldn't generate a response.",
+    }),
     { headers: { "Content-Type": "application/json" } }
   );
 };

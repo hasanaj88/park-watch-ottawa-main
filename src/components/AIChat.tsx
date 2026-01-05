@@ -13,12 +13,17 @@ import { MessageCircle, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type Message = {
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
 };
 
+const MAX_MESSAGES_BEFORE_SUMMARY = 12;
+const SUMMARIZE_FIRST_N = 8;
+const SEND_LAST_N = 6;
+
 export default function AIChat() {
   const [isOpen, setIsOpen] = useState(false);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -26,8 +31,12 @@ export default function AIChat() {
         "Hi! I'm your parking assistant. How can I help you find parking in Ottawa today?",
     },
   ]);
+
+  const [summary, setSummary] = useState<string>("");
+
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -35,36 +44,81 @@ export default function AIChat() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading, isOpen]);
+
+  const callAI = async (payloadMessages: Message[]) => {
+    const resp = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: payloadMessages }),
+    });
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(txt || `Request failed (${resp.status})`);
+    }
+
+    const data = await resp.json();
+    return String(data?.reply ?? "").trim();
+  };
+
+  const summarizeConversation = async (messagesToSummarize: Message[]) => {
+    const summarizerPrompt: Message[] = [
+      {
+        role: "system",
+        content:
+          "Summarize the conversation briefly. Keep only important facts, preferences, and context needed for future replies. Do not include extra commentary.",
+      },
+      ...messagesToSummarize
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role, content: m.content })),
+    ];
+
+    return await callAI(summarizerPrompt);
+  };
 
   const sendChat = async (userMessage: string) => {
-    const newMessages = [
+    let updated = [
       ...messages,
       { role: "user" as const, content: userMessage },
     ];
-    setMessages(newMessages);
+
+    setMessages(updated);
     setIsLoading(true);
 
     try {
-      // ✅ Memory: send last N messages only
-      const history = newMessages.slice(-10);
+      if (updated.length > MAX_MESSAGES_BEFORE_SUMMARY) {
+        const toSummarize = updated.slice(0, SUMMARIZE_FIRST_N);
+        const remaining = updated.slice(SUMMARIZE_FIRST_N);
 
-      const resp = await fetch("/api/ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
-      });
+        const newSummary = await summarizeConversation(toSummarize);
+        setSummary(newSummary);
 
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(txt || "Failed to get response");
+        updated = remaining;
+        setMessages(remaining);
       }
 
-      const data = await resp.json();
-      const reply = String(data?.reply ?? "").trim();
+      const contextMessages: Message[] = [
+        {
+          role: "system",
+          content:
+            "You are Ottawa Live Parking Assistant. Help users with parking in Ottawa. Be concise, practical, and safety-aware. If unsure, say so.",
+        },
+      ];
+
+      if (summary) {
+        contextMessages.push({
+          role: "system",
+          content: `Conversation summary: ${summary}`,
+        });
+      }
+
+      const payload = [...contextMessages, ...updated.slice(-SEND_LAST_N)];
+
+      const reply = await callAI(payload);
 
       setMessages([
-        ...newMessages,
+        ...updated,
         {
           role: "assistant",
           content: reply || "Sorry, I couldn't generate a response.",
@@ -78,6 +132,11 @@ export default function AIChat() {
           error instanceof Error ? error.message : "Failed to send message",
         variant: "destructive",
       });
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Sorry, something went wrong." },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -85,9 +144,9 @@ export default function AIChat() {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-    const message = input.trim();
+    const msg = input.trim();
     setInput("");
-    await sendChat(message);
+    await sendChat(msg);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -99,7 +158,6 @@ export default function AIChat() {
 
   return (
     <Sheet modal={false} open={isOpen} onOpenChange={setIsOpen}>
-      {/* Floating chat button */}
       <SheetTrigger asChild>
         <Button
           size="icon"
@@ -116,7 +174,6 @@ export default function AIChat() {
         </Button>
       </SheetTrigger>
 
-      {/* Chat drawer */}
       <SheetContent
         side="right"
         className="w-[400px] max-w-[90vw] p-0 flex flex-col z-[10000]"
@@ -127,24 +184,26 @@ export default function AIChat() {
 
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           <div className="space-y-4">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
+            {messages
+              .filter((m) => m.role !== "system")
+              .map((msg, idx) => (
                 <div
-                  className={`max-w-[80%] rounded-lg p-3 ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                  key={idx}
+                  className={`flex ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
             {isLoading && (
               <div className="flex justify-start">
