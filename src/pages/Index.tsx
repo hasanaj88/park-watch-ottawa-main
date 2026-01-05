@@ -10,6 +10,7 @@ import { ParkingList } from '@/components/parking/ParkingList';
 import { SearchResults } from '@/components/parking/SearchResults';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import AIChat from '@/components/AIChat';
 
 const Index = () => {
   const {
@@ -28,19 +29,20 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const { toast } = useToast();
 
-  const handleNavigate = (lot: typeof selectedLot) => {
+  // If you know the exact lot type, replace `any` with it.
+  const handleNavigate = (lot: any) => {
     try {
       openGoogleMapsNavigation(lot);
       toast({
-        title: "Opening Navigation",
-        description: `Directing you to ${lot.name} via Google Maps`,
+        title: 'Opening Navigation',
+        description: `Directing you to ${lot?.name ?? 'the selected lot'} via Google Maps`,
         duration: 3000,
       });
     } catch (error) {
       toast({
-        title: "Navigation Error",
-        description: "Could not open Google Maps. Please try again.",
-        variant: "destructive",
+        title: 'Navigation Error',
+        description: 'Could not open Google Maps. Please try again.',
+        variant: 'destructive',
         duration: 3000,
       });
     }
@@ -48,8 +50,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-parking-bg">
-      <ParkingHeader 
-        onRefresh={refreshData} 
+      <ParkingHeader
+        onRefresh={refreshData}
         isLoading={isLoading}
         onFindNearby={(nearbyLots) => {
           if (nearbyLots.length > 0) {
@@ -59,12 +61,12 @@ const Index = () => {
         }}
         allLots={lots}
       />
-      
-      <main className="container mx-auto px-4 py-6 pb-20">
+
+      <main className="container mx-auto px-4 py-6 pb-24">
         <ParkingControls
           filters={filters}
           onFiltersChange={updateFilters}
-          onSearch={() => {}} // Search is handled in the SearchResults component
+          onSearch={() => {}} // Search handled in SearchResults
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -102,10 +104,10 @@ const Index = () => {
               <div className="space-y-6">
                 <ParkingDetail
                   lot={selectedLot}
-                  availabilityPercentage={getAvailabilityPercentage(selectedLot)}
+                  availabilityPercentage={getAvailabilityPercentage(selectedLot ?? undefined)}
                   onNavigate={handleNavigate}
                 />
-                
+
                 <ParkingList
                   lots={lots}
                   selectedLotId={selectedLotId}
@@ -126,7 +128,6 @@ const Index = () => {
               onNavigate={handleNavigate}
             />
           </TabsContent>
-
         </Tabs>
       </main>
 
@@ -134,17 +135,17 @@ const Index = () => {
       <footer className="fixed bottom-0 left-0 right-0 glass-effect border-t z-40">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div>
-              Live parking data • Colorblind-safe (✓/✗ + green/red)
-            </div>
-            <div>
-              © Ottawa Live Parking
-            </div>
+            <div>Live parking data • Colorblind-safe (✓/✗ + green/red)</div>
+            <div>© Ottawa Live Parking</div>
           </div>
         </div>
       </footer>
+
+      {/* AI Chat – assumes internal styling positions */}
+      <AIChat />
     </div>
   );
 };
 
 export default Index;
+
