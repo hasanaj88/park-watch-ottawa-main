@@ -1,39 +1,48 @@
-export const onRequestPost: PagesFunction = async (context) => {
-  const { request, env } = context;
+export const onRequestPost: PagesFunction<{ AI: any }> = async ({ request, env }) => {
+  const body = await request.json().catch(() => ({}));
 
-  let body: any = {};
-  try {
-    body = await request.json();
-  } catch {}
+  //  { message } or { messages: [...] }
+  const messagesInput = Array.isArray(body?.messages) ? body.messages : null;
+  const singleMessage = typeof body?.message === "string" ? body.message : "";
 
-  const message = String(body?.message ?? "").trim();
-  if (!message) {
-    return new Response(JSON.stringify({ reply: "Please enter a message." }), {
-      status: 400,
+  const system = {
+    role: "system",
+    content:
+      "You are Ottawa Live Parking Assistant. Help users with parking in Ottawa. Be concise, practical, and safety-aware. If unsure, say so.",
+  };
+
+  const chatHistory = messagesInput
+    ? messagesInput
+        .filter(
+          (m: any) =>
+            m &&
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.content === "string"
+        )
+        .map((m: any) => ({ role: m.role, content: m.content }))
+    : singleMessage
+      ? [{ role: "user", content: singleMessage }]
+      : [];
+
+  if (chatHistory.length === 0) {
+    return new Response(JSON.stringify({ reply: "Please send a message." }), {
       headers: { "Content-Type": "application/json" },
+      status: 400,
     });
   }
 
-  // Workers AI call
-  const aiRes = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an assistant for Ottawa Live Parking. Be concise and helpful.",
-      },
-      { role: "user", content: message },
-    ],
-    max_tokens: 200,
-  });
+  // prompt (llama instruct)
+  const prompt =
+    [system, ...chatHistory]
+      .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+      .join("\n") + "\nASSISTANT:";
 
-  const reply =
-    (aiRes as any)?.response ??
-    (aiRes as any)?.result ??
-    (aiRes as any)?.text ??
-    "Sorry, I could not generate a response.";
+  const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", { prompt });
 
-  return new Response(JSON.stringify({ reply }), {
-    headers: { "Content-Type": "application/json" },
-  });
+  const reply = (result?.response ?? result?.result ?? "").toString().trim();
+
+  return new Response(
+    JSON.stringify({ reply: reply || "Sorry, I couldn't generate a response." }),
+    { headers: { "Content-Type": "application/json" } }
+  );
 };

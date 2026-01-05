@@ -46,10 +46,13 @@ export default function AIChat() {
     setIsLoading(true);
 
     try {
+      // ✅ Memory: send last N messages only
+      const history = newMessages.slice(-10);
+
       const resp = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({ messages: history }),
       });
 
       if (!resp.ok) {
