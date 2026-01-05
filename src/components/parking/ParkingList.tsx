@@ -1,7 +1,8 @@
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ParkingLot } from '@/types/parking';
-import { MapPin, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import type { ParkingLot } from "@/types/parking";
+import { MapPin, CheckCircle, AlertTriangle } from "lucide-react";
+import { getLotCounts } from "@/utils/parkingLot";
 
 interface ParkingListProps {
   lots: ParkingLot[];
@@ -10,111 +11,132 @@ interface ParkingListProps {
   getAvailabilityPercentage: (lot: ParkingLot) => number;
 }
 
-export const ParkingList = ({ 
-  lots, 
-  selectedLotId, 
+export const ParkingList = ({
+  lots,
+  selectedLotId,
   onLotSelect,
-  getAvailabilityPercentage 
+  getAvailabilityPercentage,
 }: ParkingListProps) => {
   return (
     <Card className="p-4">
       <h3 className="text-lg font-semibold mb-4">Nearby Parking Lots</h3>
+
       <div className="max-h-[50vh] overflow-y-auto space-y-3">
         {lots.map((lot) => {
-          const availableSpots = lot.capacity - lot.occupied;
-          const availabilityPercentage = getAvailabilityPercentage(lot);
-          const isSelected = lot.id === selectedLotId;
-          const StatusIcon = lot.status === 'available' ? CheckCircle : AlertTriangle;
+          const { total, free } = getLotCounts(lot);
+
+          const hasLiveData =
+            (lot as any).hasLiveData === true ||
+            (lot as any).free !== null ||
+            (typeof free === "number" && Number.isFinite(free));
+
+          const availabilityPercentage = hasLiveData ? getAvailabilityPercentage(lot) : null;
+
+          const isSelected = String(lot.id) === String(selectedLotId);
+
+          const isAvailable = lot.status === "available";
+          const StatusIcon = isAvailable ? CheckCircle : AlertTriangle;
+
+          const addressText = lot.address ?? "—";
+
+          const rate = lot.pricing?.rate ?? "—";
+          const maxStay = lot.pricing?.maxStay ?? "—";
+          const openUntil = lot.pricing?.openUntil ?? "—";
+
+          const amenities = Array.isArray(lot.amenities) ? lot.amenities : [];
+          const showPricing = rate !== "—" || maxStay !== "—" || openUntil !== "—";
 
           return (
             <button
-              key={lot.id}
-              onClick={() => onLotSelect(lot.id)}
+              key={String(lot.id)}
+              onClick={() => onLotSelect(String(lot.id))}
               className={`
                 w-full p-4 rounded-xl border bg-card text-left
                 transition-all duration-200 hover:shadow-md hover:scale-[1.02]
-                ${isSelected ? 'ring-2 ring-parking-ring bg-parking-ring/5' : ''}
+                ${isSelected ? "ring-2 ring-parking-ring bg-parking-ring/5" : ""}
               `}
             >
               <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-center">
-                {/* Status Indicator */}
                 <div className="flex flex-col items-center gap-1">
-                  <StatusIcon 
+                  <StatusIcon
                     className={`
-                      h-4 w-4 
-                      ${lot.status === 'available' ? 'text-parking-available' : 'text-parking-busy'}
-                    `} 
+                      h-4 w-4
+                      ${isAvailable ? "text-parking-available" : "text-parking-busy"}
+                    `}
                   />
-                  <div 
+                  <div
                     className={`
                       w-2 h-2 rounded-full
-                      ${lot.status === 'available' ? 'status-dot-available' : 'status-dot-busy'}
-                    `} 
+                      ${isAvailable ? "status-dot-available" : "status-dot-busy"}
+                    `}
                   />
                 </div>
 
-                {/* Lot Information */}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-semibold truncate">{lot.name}</h4>
-                    <Badge 
-                      variant={lot.status === 'available' ? 'default' : 'destructive'}
-                      className={`
-                        text-xs px-2 py-0.5
-                        ${lot.status === 'available' ? 'status-available' : 'status-busy'}
-                      `}
-                    >
-                      {availabilityPercentage}%
-                    </Badge>
+
+                    {availabilityPercentage === null ? (
+                      <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                        No live
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant={isAvailable ? "default" : "destructive"}
+                        className={`
+                          text-xs px-2 py-0.5
+                          ${isAvailable ? "status-available" : "status-busy"}
+                        `}
+                      >
+                        {availabilityPercentage}%
+                      </Badge>
+                    )}
                   </div>
-                  
+
                   <p className="text-sm text-muted-foreground mb-1">
-                    {availableSpots} free • {lot.capacity} total
+                    {availabilityPercentage === null ? "No live data" : `${free} free • ${total} total`}
                   </p>
-                  
+
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />
-                    <span className="truncate">{lot.address}</span>
+                    <span className="truncate">{addressText}</span>
                   </div>
 
-                  {/* Pricing Info */}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                    <span>{lot.pricing.rate}</span>
-                    <span>•</span>
-                    <span>Max: {lot.pricing.maxStay}</span>
-                    <span>•</span>
-                    <span>Until: {lot.pricing.openUntil}</span>
-                  </div>
+                  {showPricing && (
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <span>{rate}</span>
+                      <span>•</span>
+                      <span>Max: {maxStay}</span>
+                      <span>•</span>
+                      <span>Until: {openUntil}</span>
+                    </div>
+                  )}
 
-                  {/* Amenities */}
-                  {lot.amenities && lot.amenities.length > 0 && (
+                  {amenities.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {lot.amenities.slice(0, 3).map((amenity, index) => (
-                        <span 
-                          key={index} 
+                      {amenities.slice(0, 3).map((amenity, index) => (
+                        <span
+                          key={`${amenity}-${index}`}
                           className="text-xs px-2 py-0.5 bg-muted rounded-md"
                         >
                           {amenity}
                         </span>
                       ))}
-                      {lot.amenities.length > 3 && (
+                      {amenities.length > 3 && (
                         <span className="text-xs text-muted-foreground">
-                          +{lot.amenities.length - 3} more
+                          +{amenities.length - 3} more
                         </span>
                       )}
                     </div>
                   )}
                 </div>
 
-                {/* Availability Display */}
                 <div className="flex flex-col items-center gap-2">
                   <div className="text-center">
                     <div className="text-sm font-semibold">
-                      {availabilityPercentage}%
+                      {availabilityPercentage === null ? "—" : `${availabilityPercentage}%`}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      available
-                    </div>
+                    <div className="text-xs text-muted-foreground">{lot.status}</div>
                   </div>
                 </div>
               </div>

@@ -1,24 +1,40 @@
+export type ParkingStatus = "available" | "busy";
+
+export interface ParkingCoordinates {
+  lat: number;
+  lng: number;
+}
+
+export interface ParkingPricing {
+  rate: string;
+  maxStay: string;
+  openUntil: string;
+}
+
 export interface ParkingLot {
   id: string;
   name: string;
+
+  // Legacy/required UI fields
   capacity: number;
   occupied: number;
-  status: 'available' | 'busy';
+  status: ParkingStatus;
+
   confidence: number;
-  camThumb?: string;
+
   address: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  pricing: {
-    rate: string;
-    maxStay: string;
-    openUntil: string;
-  };
+  coordinates: ParkingCoordinates;
+
+  pricing: ParkingPricing;
   amenities?: string[];
+
   lastUpdated: Date;
-  distanceKm?: number; // Optional distance in kilometers for search results
+  distanceKm?: number;
+
+  // Supabase-compatible aliases (optional)
+  total?: number;
+  free?: number;
+  conf?: number;
 }
 
 export interface ParkingFilters {
@@ -29,9 +45,7 @@ export interface ParkingFilters {
 
 export interface MapPin {
   id: string;
-  position: {
-    x: number;
-    y: number;
-  };
+  position: { x: number; y: number };
   lot: ParkingLot;
 }
+

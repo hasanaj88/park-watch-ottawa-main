@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { ParkingLot } from "@/types/parking";
+import type { ParkingLot } from "@/types/parking";
 import { Car, MapPin } from "lucide-react";
 import {
   Tooltip,
@@ -7,6 +7,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+// utils
+import { getLotCounts } from "@/utils/parkingLot";
 
 interface ParkingSpace {
   id: string;
@@ -16,12 +19,6 @@ interface ParkingSpace {
 
 interface ParkingLotDetailMapProps {
   lot: ParkingLot;
-}
-
-function safeInt(x: unknown, fallback = 0) {
-  const n = typeof x === "number" ? x : Number(x);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.floor(n));
 }
 
 function spaceTypeLabel(type: ParkingSpace["type"]) {
@@ -38,7 +35,6 @@ function spaceTypeLabel(type: ParkingSpace["type"]) {
 }
 
 function freePctTheme(freePct: number) {
-  // 0-29 busy, 30-59 medium, 60-100 good
   if (freePct >= 60) {
     return {
       pill:
@@ -66,16 +62,51 @@ function freePctTheme(freePct: number) {
   };
 }
 
-// Generate parking spaces layout for visualization
+// Hash a string to a 32-bit integer seed
+function hashToSeed(str: string) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number) {
+  let t = seed >>> 0;
+  return function () {
+    t += 0x6d2b79f5;
+    let x = Math.imul(t ^ (t >>> 15), 1 | t);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 const generateParkingSpaces = (lot: ParkingLot): ParkingSpace[] => {
   const spaces: ParkingSpace[] = [];
 
-  const capacity = safeInt((lot as any).capacity, 0);
-  const occupied = safeInt((lot as any).occupied, 0);
+  const { total: capacity, occupied } = getLotCounts(lot);
 
-  for (let i = 0; i < capacity; i++) {
-    const isOccupied = i < occupied;
-    const type =
+  const totalSpaces = Math.max(0, capacity);
+  const occ = Math.max(0, Math.min(occupied, totalSpaces));
+
+  // Generate spaces with a pseudo-random but consistent distribution
+  const seed = hashToSeed(String(lot.id ?? "lot"));
+  const rand = mulberry32(seed);
+
+  const indices = Array.from({ length: totalSpaces }, (_, i) => i);
+  // Fisher-Yates shuffle
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  const occupiedSet = new Set(indices.slice(0, occ));
+
+  for (let i = 0; i < totalSpaces; i++) {
+    const isOccupied = occupiedSet.has(i);
+
+    const type: ParkingSpace["type"] =
       i === 0
         ? "disabled"
         : i === 1 || i === 2
@@ -125,9 +156,7 @@ const getSpaceTypeIcon = (type: ParkingSpace["type"]) => {
 export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
   const spaces = generateParkingSpaces(lot);
 
-  const capacity = safeInt((lot as any).capacity, 0);
-  const occupied = safeInt((lot as any).occupied, 0);
-  const availableSpaces = Math.max(0, capacity - occupied);
+  const { total: capacity, occupied, free: availableSpaces } = getLotCounts(lot);
 
   const totalSpaces = spaces.length;
   const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * 1.5)) : 1;
@@ -140,7 +169,6 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
   return (
     <TooltipProvider delayDuration={80}>
       <Card className="p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-2">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -162,7 +190,6 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
           </div>
         </div>
 
-        {/* Legend + Free% chip */}
         <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg border">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-green-500/80 border border-green-600 rounded" />
@@ -198,7 +225,6 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
           </div>
         </div>
 
-        {/* Parking Spaces Grid */}
         <div
           className="grid gap-2 p-6 bg-gray-200/30 dark:bg-slate-700/30 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 relative"
           style={{
@@ -206,7 +232,6 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
             gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
           }}
         >
-          {/* Road markings background pattern */}
           <div className="absolute inset-0 opacity-20">
             <div
               className="w-full h-full"
@@ -235,12 +260,10 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
                     `}
                     aria-label={`Space ${index + 1}`}
                   >
-                    {/* Space number */}
                     <span className="absolute top-0.5 left-1 text-[10px] opacity-75">
                       {index + 1}
                     </span>
 
-                    {/* Type icon */}
                     <span className="text-lg">
                       {space.isOccupied ? (
                         <Car className="h-3 w-3" />
@@ -264,7 +287,6 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
           })}
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mt-6">
           <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
             <div className="text-lg font-bold text-green-600">

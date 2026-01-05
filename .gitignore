@@ -66,3 +66,9 @@ server/.env.*
 dist/
 .vercel/
 .vercel
+.vscode/
+node_modules/
+dist/
+.env
+.env.*
+supabase/.temp/

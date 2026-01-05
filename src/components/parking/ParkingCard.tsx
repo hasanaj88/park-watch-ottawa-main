@@ -1,25 +1,24 @@
-﻿export type ParkingLot = {
-  id: string | number; // unique identifier (Supabase uuid = string)
+﻿import React from "react";
+
+export type ParkingLot = {
+  id: string | number;
 
   name?: string;
+  address?: string;
 
-  // primary fields you currently use
   free?: number;
   total?: number;
 
-  // optional alt naming (sometimes APIs use these)
   available?: number;
   capacity?: number;
 
-  // confidence + status
   conf?: number;
+  confidence?: number;
   status?: string;
 
-  //  for Supabase fields (Option 1 table has lat/lng)
   lat?: number;
   lng?: number;
 
-  //  if you prefer nested coords (your parkingApi currently returns coordinates)
   coordinates?: {
     lat: number;
     lng: number;
@@ -53,17 +52,42 @@ function trafficLabel(score: number) {
   return "Low";
 }
 
+function toInt(v: any, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+}
+
+/**
+ * Supports both:
+ * - conf as 0..100 (e.g. 82)
+ * - conf/confidence as 0..1 (e.g. 0.82)
+ */
+function normalizeConf(lot: ParkingLot): number {
+  const raw = Number(lot.conf ?? lot.confidence ?? 0);
+  if (!Number.isFinite(raw)) return 0;
+  // if it's 0..1 convert to percent
+  if (raw > 0 && raw <= 1) return Math.round(raw * 100);
+  // else assume already percent
+  return Math.round(raw);
+}
+
 export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
   if (!lot) return null;
 
-  const { name = "Unknown Parking", conf = 0, status = "unknown" } = lot;
+  const name = lot.name ?? "Unknown Parking";
+  const address = lot.address;
 
-  //  Support both naming styles safely
-  const free = lot.free ?? lot.available ?? 0;
-  const total = lot.total ?? lot.capacity ?? 0;
+  // ✅ show address first if exists (your request)
+  const title = address?.trim() ? address : name;
+
+  const status = lot.status ?? "unknown";
+  const confPct = normalizeConf(lot);
+
+  // Support both naming styles safely
+  const free = toInt(lot.free ?? lot.available ?? 0, 0);
+  const total = toInt(lot.total ?? lot.capacity ?? 0, 0);
 
   const s = normalizeStatus(status);
-
   const pct = total > 0 ? clamp(Math.round((free / total) * 100), 0, 100) : 0;
 
   const isAvailable = s === "available" || s === "open";
@@ -169,10 +193,18 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
                 break-words
                 min-h-[2.5rem]
               "
+              title={title}
             >
-              {name}
+              {title}
             </h3>
           </div>
+
+          {/* Optional: show the original name under address */}
+          {address?.trim() ? (
+            <div className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
+              {name}
+            </div>
+          ) : null}
 
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full bg-black/5 px-2.5 py-1 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
@@ -187,7 +219,7 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
 
             <span className="rounded-full bg-black/5 px-2.5 py-1 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
               <span className="opacity-70">Conf</span>{" "}
-              <span className="font-semibold text-foreground">{conf}%</span>
+              <span className="font-semibold text-foreground">{confPct}%</span>
             </span>
           </div>
         </div>
@@ -219,7 +251,6 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
         </div>
       </div>
 
-      {/* Traffic Context Block */}
       <div className="relative mt-4 rounded-xl bg-black/5 p-3 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span>Traffic context</span>
