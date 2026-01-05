@@ -9,7 +9,19 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Supabase sync function
+      - name: Call Supabase sync function (debug)
         run: |
-          curl -sS -X POST "${{ secrets.SYNC_URL }}" \
-            -H "x-sync-key: ${{ secrets.SYNC_KEY }}"
+          echo "Calling SYNC_URL..."
+          echo "SYNC_URL length: ${#{{ secrets.SYNC_URL }}}"
+
+          STATUS=$(curl -sS -o response.txt -w "%{http_code}" -X POST "${{ secrets.SYNC_URL }}" \
+            -H "x-sync-key: ${{ secrets.SYNC_KEY }}")
+
+          echo "HTTP Status: $STATUS"
+          echo "Response:"
+          cat response.txt || true
+
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "Sync failed"
+            exit 1
+          fi
