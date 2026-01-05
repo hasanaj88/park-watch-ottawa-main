@@ -2,7 +2,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { MessageCircle, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,78 +37,36 @@ export default function AIChat() {
     }
   }, [messages]);
 
-  const streamChat = async (userMessage: string) => {
-    const newMessages = [...messages, { role: "user" as const, content: userMessage }];
+  const sendChat = async (userMessage: string) => {
+    const newMessages = [
+      ...messages,
+      { role: "user" as const, content: userMessage },
+    ];
     setMessages(newMessages);
     setIsLoading(true);
 
-    let assistantContent = "";
-
     try {
-      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
-      const resp = await fetch(CHAT_URL, {
+      const resp = await fetch("/api/ai", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ messages: newMessages }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage }),
       });
 
       if (!resp.ok) {
-        const error = await resp.json();
-        throw new Error(error.error || "Failed to get response");
+        const txt = await resp.text();
+        throw new Error(txt || "Failed to get response");
       }
 
-      if (!resp.body) throw new Error("No response body");
+      const data = await resp.json();
+      const reply = String(data?.reply ?? "").trim();
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = "";
-      let streamDone = false;
-
-      // Add placeholder
-      setMessages([...newMessages, { role: "assistant", content: "" }]);
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (line.startsWith(":") || line.trim() === "") continue;
-          if (!line.startsWith("data: ")) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === "[DONE]") {
-            streamDone = true;
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: "assistant",
-                  content: assistantContent,
-                };
-                return updated;
-              });
-            }
-          } catch {
-            textBuffer = line + "\n" + textBuffer;
-            break;
-          }
-        }
-      }
+      setMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          content: reply || "Sorry, I couldn't generate a response.",
+        },
+      ]);
     } catch (error) {
       console.error("Chat error:", error);
       toast({
@@ -120,7 +84,7 @@ export default function AIChat() {
     if (!input.trim() || isLoading) return;
     const message = input.trim();
     setInput("");
-    await streamChat(message);
+    await sendChat(message);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -215,6 +179,3 @@ export default function AIChat() {
     </Sheet>
   );
 }
-
-
-
