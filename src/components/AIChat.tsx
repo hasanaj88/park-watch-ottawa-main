@@ -47,21 +47,41 @@ export default function AIChat() {
   }, [messages, isLoading, isOpen]);
 
   const callAI = async (payloadMessages: Message[]) => {
-    const resp = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: payloadMessages }),
-    });
+  const AI_BASE = import.meta.env.VITE_AI_WORKER_URL;
 
-    if (!resp.ok) {
-      const txt = await resp.text();
-      throw new Error(txt || `Request failed (${resp.status})`);
-    }
+  console.log("AI_BASE =", AI_BASE); // 👈 أضف هذا
 
-    const data = await resp.json();
-    return String(data?.reply ?? "").trim();
-  };
+  if (!AI_BASE) {
+    throw new Error("AI service is not configured");
+  }
 
+  const resp = await fetch(`${AI_BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: payloadMessages
+        .filter((m) => m.role !== "system")
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n"),
+    }),
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(txt || `Request failed (${resp.status})`);
+  }
+
+  const data = await resp.json();
+
+  return (
+    data?.result?.response ||
+    data?.result?.output_text ||
+    data?.result?.text ||
+    "No response"
+  );
+};
+
+  
   const summarizeConversation = async (messagesToSummarize: Message[]) => {
     const summarizerPrompt: Message[] = [
       {

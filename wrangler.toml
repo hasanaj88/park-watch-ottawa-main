@@ -1,5 +1,7 @@
 name = "park-watch-ottawa-main"
+main = "src/index.ts"
 compatibility_date = "2024-12-01"
+workers_dev = true
 
 [ai]
 binding = "AI"
