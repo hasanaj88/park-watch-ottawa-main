@@ -159,7 +159,7 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
   const { total: capacity, occupied, free: availableSpaces } = getLotCounts(lot);
 
   const totalSpaces = spaces.length;
-  const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * 1.5)) : 1;
+  const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * 0.6)) : 1;
   const rows = totalSpaces > 0 ? Math.ceil(totalSpaces / cols) : 1;
 
   const freePct =
