@@ -6,22 +6,21 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
 
-    // CORS preflight
+    // Preflight
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: cors });
     }
 
     const url = new URL(request.url);
 
-    // Health check
+    //  Health check
     if (url.pathname === "/") {
-      return new Response(
-        JSON.stringify({ ok: true, service: "park-watch-ai-worker" }),
-        { headers: { "Content-Type": "application/json", ...cors } }
-      );
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json", ...cors },
+      });
     }
 
-    // Chat endpoint
+    // AI Chat endpoint
     if (url.pathname === "/api/chat" && request.method === "POST") {
       const body = await request.json().catch(() => ({}));
       const prompt = String(body?.prompt ?? "").trim();
@@ -33,14 +32,19 @@ export default {
         });
       }
 
-      // Cloudflare Workers AI
-      // Llama instruct
-      const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
-        messages: [
-          { role: "system", content: "You are a helpful assistant for parking and city info." },
-          { role: "user", content: prompt },
-        ],
-      });
+      const result = await env.AI.run(
+        "@cf/meta/llama-3.1-8b-instruct",
+        {
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are Ottawa Live Parking Assistant. Help users find parking in Ottawa. Be concise and practical.",
+            },
+            { role: "user", content: prompt },
+          ],
+        }
+      );
 
       return new Response(JSON.stringify({ result }), {
         headers: { "Content-Type": "application/json", ...cors },

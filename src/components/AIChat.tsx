@@ -49,8 +49,6 @@ export default function AIChat() {
   const callAI = async (payloadMessages: Message[]) => {
   const AI_BASE = import.meta.env.VITE_AI_WORKER_URL;
 
-  console.log("AI_BASE =", AI_BASE); // 👈 أضف هذا
-
   if (!AI_BASE) {
     throw new Error("AI service is not configured");
   }
@@ -73,12 +71,16 @@ export default function AIChat() {
 
   const data = await resp.json();
 
-  return (
-    data?.result?.response ||
-    data?.result?.output_text ||
-    data?.result?.text ||
-    "No response"
-  );
+  const reply =
+  data?.result?.response ??
+  data?.result?.output_text ??
+  data?.result?.text ??
+  data?.reply ??
+  "";
+
+return String(reply).trim() || "No response";
+
+
 };
 
   
