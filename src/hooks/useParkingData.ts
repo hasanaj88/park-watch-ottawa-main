@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { ParkingLot, ParkingFilters } from "@/types/parking";
+import type { ParkingLot, ParkingFilters, ParkingStatus } from "@/types/parking";
 import { useToast } from "@/hooks/use-toast";
 import {
   calculateDistance,
@@ -69,14 +69,13 @@ type DbParkingLot = {
   created_at?: string | null;
 };
 
-const toUiStatus = (s: string | null | undefined): ParkingLot["status"] => {
+const STATUS_AVAILABLE: ParkingStatus = "available";
+const STATUS_BUSY: ParkingStatus = "busy";
+
+const toUiStatus = (s: string | null | undefined): ParkingStatus => {
   const x = String(s ?? "").toLowerCase().trim();
-
-  if (x === "available" || x === "open") return "available";
-  if (x === "full" || x === "occupied") return "occupied";
-  if (x === "busy" || x === "closed") return "busy";
-
-  return "busy";
+  if (x === "available" || x === "open") return STATUS_AVAILABLE;
+  return STATUS_BUSY;
 };
 
 export function getConfPct(lot: ParkingLot) {
@@ -136,13 +135,13 @@ const mapDbLotToParkingLot = (row: DbParkingLot): ParkingLotWithExtras => {
     }
   }
 
-  const status: ParkingLot["status"] = hasLiveData
+  const status: ParkingStatus = hasLiveData
     ? row.api_status
       ? toUiStatus(row.api_status)
       : free > 0
-        ? "available"
-        : "occupied"
-    : "busy";
+        ? STATUS_AVAILABLE
+        : STATUS_BUSY
+    : STATUS_BUSY;
 
   const lat = typeof row.lat === "number" && Number.isFinite(row.lat) ? row.lat : null;
   const lng = typeof row.lng === "number" && Number.isFinite(row.lng) ? row.lng : null;
@@ -177,6 +176,30 @@ const mapDbLotToParkingLot = (row: DbParkingLot): ParkingLotWithExtras => {
   };
 };
 
+const dedupLots = (items: ParkingLotWithExtras[]) => {
+  const seen = new Set<string>();
+  const out: ParkingLotWithExtras[] = [];
+
+  for (const lot of items) {
+    const ottId = (lot.ottawa_lot_id ?? "").trim();
+    const lat = Number(lot.coordinates?.lat ?? 0).toFixed(6);
+    const lng = Number(lot.coordinates?.lng ?? 0).toFixed(6);
+    const baseName = normalizeLotName(lot.name);
+
+    const key = ottId
+      ? `ott:${ottId}`
+      : lat !== "0.000000" || lng !== "0.000000"
+        ? `geo:${lat},${lng}|${baseName}`
+        : `id:${String(lot.id)}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(lot);
+  }
+
+  return out;
+};
+
 export const useParkingData = () => {
   const [lotsState, setLotsState] = useState<ParkingLotWithExtras[]>([]);
   const [selectedLotId, setSelectedLotId] = useState<string>("");
@@ -194,7 +217,7 @@ export const useParkingData = () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("parking_lots")
+        .from("parking_lots_clean")
         .select(
           "id,ottawa_lot_id,name,capacity,api_available,api_occupied,virtual_occupied,api_status,lat,lng,created_at"
         )
@@ -205,11 +228,14 @@ export const useParkingData = () => {
       const rows = Array.isArray(data) ? (data as DbParkingLot[]) : [];
       const mapped = rows.filter((r) => r && r.id && r.name).map(mapDbLotToParkingLot);
 
-      setLotsState(mapped);
+      // Optional: keep dedup in code as an extra guard
+      const clean = dedupLots(mapped);
+
+      setLotsState(clean);
 
       setSelectedLotId((prev) => {
-        if (prev && mapped.some((x) => String(x.id) === String(prev))) return prev;
-        return mapped[0]?.id ? String(mapped[0].id) : "";
+        if (prev && clean.some((x) => String(x.id) === String(prev))) return prev;
+        return clean[0]?.id ? String(clean[0].id) : "";
       });
     } catch (e: any) {
       console.error("fetchLots failed", e);
@@ -266,7 +292,7 @@ export const useParkingData = () => {
         return false;
       }
 
-      if (filters.onlyAvailable && lot.status !== "available") return false;
+      if (filters.onlyAvailable && lot.status !== STATUS_AVAILABLE) return false;
 
       if (filterTerm) {
         if (filterWords.length === 0) return true;
