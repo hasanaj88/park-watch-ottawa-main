@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import type { ParkingLot } from "@/types/parking";
 import { Car, MapPin } from "lucide-react";
+import { useDeviceMode } from "@/hooks/useDeviceMode";
 import {
   Tooltip,
   TooltipContent,
@@ -8,7 +10,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// utils
 import { getLotCounts } from "@/utils/parkingLot";
 
 interface ParkingSpace {
@@ -62,7 +63,6 @@ function freePctTheme(freePct: number) {
   };
 }
 
-// Hash a string to a 32-bit integer seed
 function hashToSeed(str: string) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -84,18 +84,15 @@ function mulberry32(seed: number) {
 
 const generateParkingSpaces = (lot: ParkingLot): ParkingSpace[] => {
   const spaces: ParkingSpace[] = [];
-
   const { total: capacity, occupied } = getLotCounts(lot);
 
   const totalSpaces = Math.max(0, capacity);
   const occ = Math.max(0, Math.min(occupied, totalSpaces));
 
-  // Generate spaces with a pseudo-random but consistent distribution
   const seed = hashToSeed(String(lot.id ?? "lot"));
   const rand = mulberry32(seed);
 
   const indices = Array.from({ length: totalSpaces }, (_, i) => i);
-  // Fisher-Yates shuffle
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -154,36 +151,89 @@ const getSpaceTypeIcon = (type: ParkingSpace["type"]) => {
 };
 
 export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
-  const spaces = generateParkingSpaces(lot);
+  const device = useDeviceMode();
 
   const { total: capacity, occupied, free: availableSpaces } = getLotCounts(lot);
 
+  const spaces = useMemo(() => generateParkingSpaces(lot), [
+    lot?.id,
+    (lot as any)?.capacity,
+    (lot as any)?.total,
+    (lot as any)?.occupied,
+    (lot as any)?.free,
+    (lot as any)?.available,
+  ]);
+
   const totalSpaces = spaces.length;
-  const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * 0.6)) : 1;
+
+  const density = device === "mobile" ? 0.55 : device === "tablet" ? 0.9 : 1.3;
+
+  const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * density)) : 1;
   const rows = totalSpaces > 0 ? Math.ceil(totalSpaces / cols) : 1;
 
-  const freePct =
-    capacity > 0 ? Math.round((availableSpaces / capacity) * 100) : 0;
+  const freePct = capacity > 0 ? Math.round((availableSpaces / capacity) * 100) : 0;
   const pctTheme = freePctTheme(freePct);
+
+  const canRenderLayout = Number.isFinite(capacity) && capacity > 0 && totalSpaces > 0;
+
+  const cellH = device === "mobile" ? "h-8" : device === "tablet" ? "h-10" : "h-12";
+  const cellRadius = device === "mobile" ? "rounded-lg" : "rounded-md";
+  const gridPadding = device === "mobile" ? "p-3" : "p-6";
+
+  const enableTooltip = device === "desktop";
+
+  const hoverScale = device === "desktop" ? "hover:scale-105" : "";
+
+  const SpaceCell = ({
+  space,
+  index,
+  title,
+}: {
+  space: ParkingSpace;
+  index: number;
+  title?: string;
+}) => {
+  return (
+    <div
+      className={`
+        relative ${cellH} ${cellRadius} border-2 transition-all duration-200 ${hoverScale} cursor-pointer
+        flex items-center justify-center text-white shadow-sm
+        ${getSpaceTypeColor(space.type, space.isOccupied)}
+      `}
+      aria-label={title ?? `Parking space`}
+      title={title}
+    >
+      {/* Icon only */}
+      {device !== "mobile" && (
+        <span className="text-lg">
+          {space.isOccupied ? (
+            <Car className="h-3 w-3" />
+          ) : (
+            getSpaceTypeIcon(space.type)
+          )}
+        </span>
+      )}
+    </div>
+  );
+};
+
 
   return (
     <TooltipProvider delayDuration={80}>
       <Card className="p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-2">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="p-2 bg-primary/10 rounded-lg">
               <MapPin className="h-5 w-5 text-primary" />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold">{lot.name}</h3>
-              <p className="text-sm text-muted-foreground">
-                Detailed Parking Layout
-              </p>
+            <div className="min-w-0">
+              <h3 className="text-lg font-semibold truncate">{lot.name}</h3>
+              <p className="text-sm text-muted-foreground">Detailed Parking Layout</p>
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">
               {availableSpaces}
             </div>
             <div className="text-xs text-muted-foreground">available</div>
@@ -225,73 +275,67 @@ export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
           </div>
         </div>
 
-        <div
-          className="grid gap-2 p-6 bg-gray-200/30 dark:bg-slate-700/30 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 relative"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          }}
-        >
-          <div className="absolute inset-0 opacity-20">
-            <div
-              className="w-full h-full"
-              style={{
-                backgroundImage: `
-                  linear-gradient(90deg, transparent 0%, transparent 45%, #666 45%, #666 55%, transparent 55%, transparent 100%),
-                  linear-gradient(0deg, transparent 0%, transparent 45%, #666 45%, #666 55%, transparent 55%, transparent 100%)
-                `,
-                backgroundSize: `${100 / cols}% ${100 / rows}%`,
-              }}
-            />
-          </div>
-
-          {spaces.map((space, index) => {
-            const typeLabel = spaceTypeLabel(space.type);
-            const stateLabel = space.isOccupied ? "Occupied" : "Available";
-
-            return (
-              <Tooltip key={space.id}>
-                <TooltipTrigger asChild>
-                  <div
-                    className={`
-                      relative h-12 rounded-md border-2 transition-all duration-200 hover:scale-105 cursor-pointer
-                      flex items-center justify-center text-xs font-semibold text-white shadow-sm
-                      ${getSpaceTypeColor(space.type, space.isOccupied)}
-                    `}
-                    aria-label={`Space ${index + 1}`}
-                  >
-                    <span className="absolute top-0.5 left-1 text-[10px] opacity-75">
-                      {index + 1}
-                    </span>
-
-                    <span className="text-lg">
-                      {space.isOccupied ? (
-                        <Car className="h-3 w-3" />
-                      ) : (
-                        getSpaceTypeIcon(space.type)
-                      )}
-                    </span>
-                  </div>
-                </TooltipTrigger>
-
-                <TooltipContent side="top" align="center">
-                  <div className="text-xs">
-                    <div className="font-semibold">
-                      Space {index + 1} — {stateLabel}
-                    </div>
-                    <div className="opacity-80">{typeLabel}</div>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            );
-          })}
-        </div>
-
-        <div className="grid grid-cols-4 gap-4 mt-6">
-          <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <div className="text-lg font-bold text-green-600">
-              {availableSpaces}
+        {!canRenderLayout ? (
+          <div className="rounded-xl border border-dashed border-gray-300 dark:border-slate-600 bg-gray-200/20 dark:bg-slate-700/20 p-6 text-center">
+            <div className="text-sm font-semibold text-foreground">Layout not available</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Capacity is missing or zero for this lot.
             </div>
+          </div>
+        ) : (
+          <div
+            className={`grid gap-2 ${gridPadding} bg-gray-200/30 dark:bg-slate-700/30 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 relative`}
+            style={{
+              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+              gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+            }}
+          >
+            <div className="absolute inset-0 opacity-20">
+              <div
+                className="w-full h-full"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(90deg, transparent 0%, transparent 45%, #666 45%, #666 55%, transparent 55%, transparent 100%),
+                    linear-gradient(0deg, transparent 0%, transparent 45%, #666 45%, #666 55%, transparent 55%, transparent 100%)
+                  `,
+                  backgroundSize: `${100 / cols}% ${100 / rows}%`,
+                }}
+              />
+            </div>
+
+            {spaces.map((space, index) => {
+              const typeLabel = spaceTypeLabel(space.type);
+              const stateLabel = space.isOccupied ? "Occupied" : "Available";
+              const title = `Space ${index + 1} — ${stateLabel} (${typeLabel})`;
+
+              if (!enableTooltip) {
+                return <SpaceCell key={space.id} space={space} index={index} title={title} />;
+              }
+
+              return (
+                <Tooltip key={space.id}>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <SpaceCell space={space} index={index} />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="center">
+                    <div className="text-xs">
+                      <div className="font-semibold">
+                        Space {index + 1} — {stateLabel}
+                      </div>
+                      <div className="opacity-80">{typeLabel}</div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+          <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+            <div className="text-lg font-bold text-green-600">{availableSpaces}</div>
             <div className="text-xs text-muted-foreground">Available</div>
           </div>
 
