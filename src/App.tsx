@@ -10,26 +10,47 @@ import "leaflet/dist/leaflet.css";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <div className="app-parking-bg">
-    <div className="app-content">
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+const MAINTENANCE_MODE = true;
+
+function Maintenance() {
+  return (
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "2rem",
+      }}
+    >
+      🚧 Under Maintenance – Back Soon
     </div>
-  </div>
-);
+  );
+}
 
-export default App;
+function MainApp() {
+  return (
+    <div className="app-parking-bg">
+      <div className="app-content">
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </TooltipProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </div>
+    </div>
+  );
+}
 
+export default function App() {
+  return MAINTENANCE_MODE ? <Maintenance /> : <MainApp />;
+}
