@@ -6,7 +6,7 @@ import { MOCK_CAMERAS } from "@/data/mockCameras";
 import { MOCK_EVENTS } from "@/data/mockEvents";
 
 import type { Camera, TrafficEvent } from "@/lib/traffic/trafficSummary";
-import type { ParkingLot } from "@/components/parking/ParkingCard";
+import type { ParkingLot } from "@/types/parking";
 
 export type ParkingDataBundle = {
   lots: ParkingLot[];

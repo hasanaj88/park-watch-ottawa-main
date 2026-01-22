@@ -2,21 +2,19 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { ParkingLot } from "@/types/parking";
 import { MapPin, CheckCircle, AlertTriangle } from "lucide-react";
-import { getLotCounts } from "@/utils/parkingLot";
+import {
+  getLotCounts,
+  getFreePct,
+  availabilityLevelByFreePct,
+} from "@/utils/parking";
 
 interface ParkingListProps {
   lots: ParkingLot[];
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
-  getAvailabilityPercentage: (lot: ParkingLot) => number;
 }
 
-export const ParkingList = ({
-  lots,
-  selectedLotId,
-  onLotSelect,
-  getAvailabilityPercentage,
-}: ParkingListProps) => {
+export const ParkingList = ({ lots, selectedLotId, onLotSelect }: ParkingListProps) => {
   return (
     <Card className="p-4">
       <h3 className="text-lg font-semibold mb-4">Nearby Parking Lots</h3>
@@ -25,17 +23,40 @@ export const ParkingList = ({
         {lots.map((lot) => {
           const { total, free } = getLotCounts(lot);
 
-          const hasLiveData =
-            (lot as any).hasLiveData === true ||
-            (lot as any).free !== null ||
-            (typeof free === "number" && Number.isFinite(free));
-
-          const availabilityPercentage = hasLiveData ? getAvailabilityPercentage(lot) : null;
+          const freePct = getFreePct(lot); // number | null
+          const level = freePct == null ? null : availabilityLevelByFreePct(freePct);
 
           const isSelected = String(lot.id) === String(selectedLotId);
 
-          const isAvailable = lot.status === "available";
-          const StatusIcon = isAvailable ? CheckCircle : AlertTriangle;
+          // ✅ icon color by level (60/30 thresholds)
+          const StatusIcon = level === "busy" ? AlertTriangle : CheckCircle;
+
+          const iconClass =
+            level === "available"
+              ? "text-parking-available"
+              : level === "moderate"
+              ? "status-dot-moderate"
+              : "text-parking-busy";
+
+          const dotClass =
+            level === "available"
+              ? "status-dot-available"
+              : level === "moderate"
+              ? "status-dot-moderate"
+              : "status-dot-busy";
+
+          const badgeVariant =
+            level === "available" ? "default" : level === "moderate" ? "secondary" : "destructive";
+
+          const badgeClass =
+            level === "available"
+              ? "status-available"
+              : level === "moderate"
+              ? "status-moderate"
+              : "status-busy";
+
+          const statusText =
+            level === "available" ? "available" : level === "moderate" ? "moderate" : "busy";
 
           const addressText = lot.address ?? "—";
 
@@ -58,43 +79,31 @@ export const ParkingList = ({
             >
               <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-center">
                 <div className="flex flex-col items-center gap-1">
-                  <StatusIcon
-                    className={`
-                      h-4 w-4
-                      ${isAvailable ? "text-parking-available" : "text-parking-busy"}
-                    `}
-                  />
-                  <div
-                    className={`
-                      w-2 h-2 rounded-full
-                      ${isAvailable ? "status-dot-available" : "status-dot-busy"}
-                    `}
-                  />
+                  <StatusIcon className={`h-4 w-4 ${iconClass}`} />
+                  <div className={`w-2 h-2 rounded-full ${dotClass}`} />
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-semibold truncate">{lot.name}</h4>
 
-                    {availabilityPercentage === null ? (
+                    {freePct === null ? (
                       <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                        No live
+                        No data
                       </Badge>
                     ) : (
                       <Badge
-                        variant={isAvailable ? "default" : "destructive"}
-                        className={`
-                          text-xs px-2 py-0.5
-                          ${isAvailable ? "status-available" : "status-busy"}
-                        `}
+                        variant={badgeVariant}
+                        className={`text-xs px-2 py-0.5 ${badgeClass}`}
+                        title="Free percentage"
                       >
-                        {availabilityPercentage}%
+                        {freePct}%
                       </Badge>
                     )}
                   </div>
 
                   <p className="text-sm text-muted-foreground mb-1">
-                    {availabilityPercentage === null ? "No live data" : `${free} free • ${total} total`}
+                    {freePct === null ? "No live/estimated counts" : `${free} free • ${total} total`}
                   </p>
 
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -134,9 +143,11 @@ export const ParkingList = ({
                 <div className="flex flex-col items-center gap-2">
                   <div className="text-center">
                     <div className="text-sm font-semibold">
-                      {availabilityPercentage === null ? "—" : `${availabilityPercentage}%`}
+                      {freePct === null ? "—" : `${freePct}%`}
                     </div>
-                    <div className="text-xs text-muted-foreground">{lot.status}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {freePct === null ? "no data" : statusText}
+                    </div>
                   </div>
                 </div>
               </div>

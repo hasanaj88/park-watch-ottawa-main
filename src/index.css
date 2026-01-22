@@ -34,6 +34,7 @@
     --parking-border: 220 13% 91%;
     --parking-available: 142 76% 36%;
     --parking-busy: 0 84% 60%;
+    --parking-moderate: 45 93% 47%;
     --parking-ring: 158 64% 52%;
     --parking-muted: 215.4 16.3% 46.9%;
 
@@ -71,6 +72,7 @@
     --parking-border: 217.2 32.6% 17.5%;
     --parking-available: 142 76% 36%;
     --parking-busy: 0 84% 60%;
+    --parking-moderate: 45 93% 47%;
     --parking-ring: 158 64% 52%;
     --parking-muted: 215 20.2% 65.1%;
 
@@ -110,6 +112,19 @@
   .status-dot-busy {
     background-color: hsl(var(--parking-busy));
   }
+
+.status-moderate {
+  color: hsl(var(--parking-moderate));
+  background-color: hsl(var(--parking-moderate) / 0.12);
+  border-color: hsl(var(--parking-moderate) / 0.25);
+}
+
+.status-dot-moderate {
+  color: #FFD700 !important; /* stroke current Color */
+}
+
+
+
 
   /* Glassmorphism */
   .glass-effect {
@@ -173,3 +188,4 @@
       linear-gradient(180deg, #0a1220 0%, #05070c 100%);
   }
 }
+

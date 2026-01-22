@@ -106,10 +106,16 @@ export const ParkingHeader = ({
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-parking-ring to-blue-500 flex items-center justify-center">
                 <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-parking-available to-parking-ring" />
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-parking-available text-white text-xs px-1.5 py-0.5 rounded-md font-semibold">
+
+              {/* LIVE badge — clickable */}
+              <button
+                onClick={() => (window.location.href = "/")}
+                className="absolute -bottom-1 -right-1 bg-parking-available text-white text-xs px-1.5 py-0.5 rounded-md font-semibold cursor-pointer"
+              >
                 LIVE
-              </div>
+              </button>
             </div>
+
             <div className="min-w-0">
               <h1 className="text-lg font-bold truncate">Ottawa Live Parking</h1>
               <p className="text-sm text-muted-foreground truncate">
@@ -152,7 +158,6 @@ export const ParkingHeader = ({
               </div>
             </div>
 
-            {/* Refresh + Theme grouped together */}
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

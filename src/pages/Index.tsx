@@ -1,5 +1,6 @@
-﻿import React, { useState, useMemo } from "react";
-import { useParkingData } from "@/hooks/useParkingData";
+﻿import React, { useMemo, useState } from "react";
+import { useParkingLots } from "@/hooks/useParkingLots";
+import { useEnhancedLots } from "@/hooks/useEnhancedLots";
 import { openGoogleMapsNavigation } from "@/utils/navigation";
 import { ParkingHeader } from "@/components/parking/ParkingHeader";
 import { ParkingControls } from "@/components/parking/ParkingControls";
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import AIChat from "@/components/AIChat";
 import ParkingCardsList from "@/components/parking/ParkingCardsList";
-import type { ParkingLot } from "@/components/parking/ParkingCard";
+import type { ParkingLot } from "@/types/parking";
 
 const Index = () => {
   const {
@@ -28,7 +29,17 @@ const Index = () => {
     refreshData,
     getAvailabilityPercentage,
     searchLots,
-  } = useParkingData();
+    error,
+  } = useParkingLots() as any;
+
+  // (Virtual only) useParkingLots
+  const { enhancedLots } = useEnhancedLots(lots ?? []);
+
+  
+  const selectedLotEnhanced = useMemo(() => {
+    if (!selectedLotId) return null;
+    return (enhancedLots ?? []).find((l: any) => String(l.id) === String(selectedLotId)) ?? null;
+  }, [enhancedLots, selectedLotId]);
 
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
@@ -51,23 +62,37 @@ const Index = () => {
     }
   };
 
+  //  Cards adapter: enhancedLots (virtual)
   const cardsLots: ParkingLot[] = useMemo(() => {
-  const base = (lots?.length ? lots : allLots) ?? [];
-  return base.map((lot: any) => ({
-    id: lot.id,
-    name: lot.name,
-    status: lot.status,
-    free: Math.max(0, (lot.capacity ?? 0) - (lot.occupied ?? 0)),
-    total: lot.capacity ?? 0,
-    conf: Math.round((lot.confidence ?? 0) * 100),
-  }));
-}, [lots, allLots]);
+    const base = (enhancedLots?.length ? enhancedLots : (lots?.length ? lots : allLots)) ?? [];
 
+    return base.map((lot: any) => {
+      const id = lot?.id;
+      const name = lot?.name ?? "Unknown";
 
+      const capacity = Number(lot?.capacity ?? lot?.total ?? 0);
 
+      const free =
+        typeof lot?.free === "number"
+          ? Math.max(0, lot.free)
+          : typeof lot?.available === "number"
+          ? Math.max(0, lot.available)
+          : Math.max(0, capacity - Number(lot?.occupied ?? 0));
+
+      const confidence = Number(lot?.confidence ?? lot?.conf ?? 0);
+
+      return {
+        id,
+        name,
+        status: lot?.status ?? null,
+        free,
+        total: capacity,
+        conf: Math.round(confidence * 100),
+      } as ParkingLot;
+    });
+  }, [enhancedLots, lots, allLots]);
 
   const availableOnly = Boolean((filters as any)?.onlyAvailable);
-
 
   const handleCardClick = (lot: ParkingLot) => {
     if (!lot?.id) return;
@@ -77,15 +102,15 @@ const Index = () => {
 
   return (
     <div className="app-parking-bg">
-      {/* content MUST be above background pseudo-elements */}
       <div className="app-content min-h-screen">
         <ParkingHeader
           onRefresh={refreshData}
           isLoading={isLoading}
           onFindNearby={(nearbyLots) => {
             const first = nearbyLots?.[0];
-            if (first?.id) {
-              selectLot(String(first.id));
+            const firstId = first?.id; // IDs are normalized in useParkingLots
+            if (firstId) {
+              selectLot(String(firstId));
               setActiveTab("overview");
             }
           }}
@@ -118,11 +143,11 @@ const Index = () => {
                     </div>
                   )}
 
-                  {selectedLot ? (
-                    <ParkingLotDetailMap lot={selectedLot} />
+                  {selectedLotEnhanced ? (
+                    <ParkingLotDetailMap lot={selectedLotEnhanced} />
                   ) : (
                     <ParkingMap
-                      lots={lots}
+                      lots={enhancedLots ?? lots}
                       selectedLotId={selectedLotId}
                       onLotSelect={selectLot}
                     />
@@ -130,19 +155,18 @@ const Index = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {selectedLot && (
+                  {selectedLotEnhanced && (
                     <ParkingDetail
-                      lot={selectedLot}
-                      availabilityPercentage={getAvailabilityPercentage(selectedLot)}
+                      lot={selectedLotEnhanced}
+                      availabilityPercentage={getAvailabilityPercentage(selectedLotEnhanced)}
                       onNavigate={handleNavigate}
                     />
                   )}
 
                   <ParkingList
-                    lots={lots}
-                    selectedLotId={selectedLotId}
+                    lots={enhancedLots ?? lots}
+                    selectedLotId={String(selectedLotId ?? "")}
                     onLotSelect={selectLot}
-                    getAvailabilityPercentage={getAvailabilityPercentage}
                   />
                 </div>
               </div>
@@ -165,7 +189,7 @@ const Index = () => {
                   <ParkingCardsList
                     lots={cardsLots}
                     isLoading={isLoading}
-                    error={null}
+                    error={error ?? null}
                     availableOnly={availableOnly}
                     onCardClick={handleCardClick}
                   />

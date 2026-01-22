@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import ParkingCard, { ParkingLot } from "./ParkingCard";
-
+import ParkingCard from "./ParkingCard";
+import type { ParkingLot } from "@/types/parking";
 import { buildAllSummaries } from "@/lib/traffic/trafficSummary";
 import type { Camera, TrafficEvent } from "@/lib/traffic/trafficSummary";
-
 import { getAllParkingData } from "@/services/trafficDataProvider";
+import { getFreePct } from "@/utils/parking";
 
 type Props = {
   lots?: ParkingLot[];
@@ -14,8 +14,18 @@ type Props = {
   onCardClick?: (lot: ParkingLot) => void;
 };
 
-const isParkingLot = (x: ParkingLot | undefined | null): x is ParkingLot =>
-  Boolean(x);
+const isParkingLot = (x: ParkingLot | undefined | null): x is ParkingLot => Boolean(x);
+
+function hasCoords(lot: ParkingLot) {
+  const c = lot.coordinates;
+  return (
+    c &&
+    typeof c.lat === "number" &&
+    Number.isFinite(c.lat) &&
+    typeof c.lng === "number" &&
+    Number.isFinite(c.lng)
+  );
+}
 
 export default function ParkingCardsList({
   lots,
@@ -59,68 +69,62 @@ export default function ParkingCardsList({
     return source.filter(isParkingLot);
   }, [lots, localLots]);
 
-  const summariesByLotId = useMemo(() => {
-    try {
-      return buildAllSummaries(
-        Array.isArray(cameras) ? cameras : [],
-        Array.isArray(events) ? events : []
-      );
-    } catch (e) {
-      console.error("Failed to build traffic summaries", e);
-      return {} as Record<string, any>;
-    }
-  }, [cameras, events]);
-
+  /**  availableOnly = has counts and freePct > 0 */
   const visibleLots = useMemo(() => {
     if (!availableOnly) return safeLots;
 
     return safeLots.filter((lot) => {
-      const free = lot.free ?? lot.available ?? 0;
-      return free > 0;
+      const pct = getFreePct(lot);
+      if (pct === null) return false; // No counts/data → hide in "available only"
+      return pct > 0;                 // At least some free spots
     });
   }, [safeLots, availableOnly]);
 
+  const summariesByLotId = useMemo(() => {
+    try {
+      const lotsForSummary = safeLots
+        .filter(hasCoords)
+        .map((l) => ({
+          id: String(l.id),
+          coordinates: l.coordinates!, // safe
+        }));
+
+      const cams = Array.isArray(cameras) ? cameras : [];
+      const evs = Array.isArray(events) ? events : [];
+
+      // radius (meters)
+      return buildAllSummaries(lotsForSummary, cams, evs, 800);
+    } catch (e) {
+      console.error("Failed to build traffic summaries", e);
+      return {} as Record<string, any>;
+    }
+  }, [safeLots, cameras, events]);
+
   if (isLoading) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">
-        Loading parking cards…
-      </div>
-    );
+    return <div className="p-4 text-sm text-muted-foreground">Loading parking cards…</div>;
   }
 
   if (error || trafficError) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">
-        Could not load cards right now.
-      </div>
-    );
+    return <div className="p-4 text-sm text-muted-foreground">Could not load cards right now.</div>;
   }
 
   if (!visibleLots.length) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">
-        No parking lots to display.
-      </div>
-    );
+    return <div className="p-4 text-sm text-muted-foreground">No parking lots to display.</div>;
   }
 
   return (
-    <div
-      className="
-        grid gap-4
-        grid-cols-1
-        sm:grid-cols-2
-        lg:grid-cols-3
-      "
-    >
-      {visibleLots.map((lot) => (
-        <ParkingCard
-          key={String(lot.id)}
-          lot={lot}
-          trafficSummary={summariesByLotId[String(lot.id)] ?? undefined}
-          onClick={() => onCardClick?.(lot)}
-        />
-      ))}
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      {visibleLots.map((lot) => {
+        const lotId = String(lot.id);
+        return (
+          <ParkingCard
+            key={lotId}
+            lot={lot}
+            trafficSummary={summariesByLotId[lotId] ?? undefined}
+            onClick={() => onCardClick?.(lot)}
+          />
+        );
+      })}
     </div>
   );
 }

@@ -1,15 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Navigation,
-  Clock,
-  DollarSign,
-  MapPin,
-  AlertTriangle,
-  CheckCircle,
-} from "lucide-react";
+import { Navigation, Clock, DollarSign, MapPin, AlertTriangle, CheckCircle } from "lucide-react";
 import { ParkingLot } from "@/types/parking";
+import {
+  getLotCounts,
+  getFreePct,
+  availabilityLevelByFreePct,
+} from "@/utils/parking";
 
 export type TrafficSummary = {
   nearbyCameraCount: number;
@@ -20,9 +18,9 @@ export type TrafficSummary = {
 
 interface ParkingDetailProps {
   lot: ParkingLot;
-  availabilityPercentage: number;
+  availabilityPercentage: number; // keep prop for compatibility
   onNavigate: (lot: ParkingLot) => void;
-  trafficSummary?: TrafficSummary; 
+  trafficSummary?: TrafficSummary;
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -42,23 +40,70 @@ function trafficLabel(score: number) {
 
 export const ParkingDetail = ({
   lot,
-  availabilityPercentage,
+  availabilityPercentage, // fallback only
   onNavigate,
   trafficSummary,
 }: ParkingDetailProps) => {
-  // ---- Safe fields ----
-  const capacity = safeNumber((lot as any).capacity, 0);
-  const occupied = safeNumber((lot as any).occupied, 0);
-  const availableSpots = Math.max(0, capacity - occupied);
+  //  Canonical counts
+  const { free, total } = getLotCounts(lot as any);
 
-  const status = String((lot as any).status ?? "").toLowerCase();
-  const StatusIcon = status === "available" ? CheckCircle : AlertTriangle;
+  //  Canonical free% (preferred) using shared helper (respects hasLotCounts)
+  const freePctFromCounts = getFreePct(lot); // number | null
 
-  const confPct = clamp(
-    Math.round(safeNumber((lot as any).confidence, 0) * 100),
-    0,
-    100
-  );
+  //  Fallback to prop if canonical is missing
+  const pct =
+    freePctFromCounts !== null
+      ? freePctFromCounts
+      : Number.isFinite(availabilityPercentage)
+      ? clamp(safeNumber(availabilityPercentage, 0), 0, 100)
+      : null;
+
+  const level = pct === null ? null : availabilityLevelByFreePct(pct);
+
+  const statusText =
+    pct === null
+      ? "No data"
+      : level === "available"
+      ? "Available"
+      : level === "moderate"
+      ? "Moderate"
+      : "Busy";
+
+  const StatusIcon = level === "busy" ? AlertTriangle : CheckCircle;
+
+  const badgeVariant =
+    pct === null ? "secondary" : level === "busy" ? "destructive" : "default";
+
+  const badgeClass =
+    pct === null
+      ? ""
+      : level === "available"
+      ? "status-available"
+      : level === "moderate"
+      ? "status-moderate"
+      : "status-busy";
+
+  // Gauge color by level
+  const ringStroke =
+    pct === null
+      ? "hsl(var(--muted))"
+      : level === "available"
+      ? "hsl(var(--parking-available))"
+      : level === "moderate"
+      ? "hsl(var(--parking-moderate))"
+      : "hsl(var(--parking-busy))";
+
+  // display numbers
+  const capacity = total > 0 ? total : safeNumber((lot as any).capacity, 0);
+  const availableSpots = free === null || free === undefined ? null : free;
+  const occupiedSpots =
+    availableSpots === null || !Number.isFinite(capacity) || capacity <= 0
+      ? null
+      : Math.max(0, capacity - availableSpots);
+
+  // confidence
+  const rawConf = safeNumber((lot as any).confidence ?? (lot as any).conf, 0);
+  const confPct = clamp(Math.round(rawConf > 1 ? rawConf : rawConf * 100), 0, 100);
 
   const pricing = (lot as any).pricing ?? {};
   const maxStay = pricing?.maxStay ?? "—";
@@ -75,9 +120,7 @@ export const ParkingDetail = ({
       ? new Date(lastUpdatedRaw)
       : null;
 
-  const safeAvailability = clamp(safeNumber(availabilityPercentage, 0), 0, 100);
-
-  // ---- Traffic safe defaults ----
+  // ---- Traffic ----
   const cameraCount = trafficSummary?.nearbyCameraCount ?? 0;
   const eventCount = trafficSummary?.nearbyEventCount ?? 0;
   const trafficScore = clamp(trafficSummary?.disruptionScore ?? 0, 0, 100);
@@ -100,14 +143,9 @@ export const ParkingDetail = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge
-            variant={status === "available" ? "default" : "destructive"}
-            className={`gap-1 ${
-              status === "available" ? "status-available" : "status-busy"
-            }`}
-          >
+          <Badge variant={badgeVariant} className={`gap-1 ${badgeClass}`}>
             <StatusIcon className="h-3 w-3" />
-            {status === "available" ? "Available" : "Busy"}
+            {pct === null ? "No data" : `${pct}% free`}
           </Badge>
 
           <span className="text-xs text-muted-foreground">conf {confPct}%</span>
@@ -125,29 +163,31 @@ export const ParkingDetail = ({
               d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"
             />
             <path
-              stroke="hsl(var(--parking-ring))"
+              stroke={ringStroke}
               strokeWidth="3.5"
               fill="none"
-              strokeDasharray={`${safeAvailability}, 100`}
+              strokeDasharray={`${pct ?? 0}, 100`}
               d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-semibold">{safeAvailability}%</span>
+            <span className="text-sm font-semibold">{pct === null ? "—" : `${pct}%`}</span>
           </div>
         </div>
 
         <div>
           <div className="text-2xl font-bold mb-1">
-            {availableSpots} free / {capacity}
+            {availableSpots === null || capacity <= 0 ? "—" : `${availableSpots} free / ${capacity}`}
           </div>
           <p className="text-sm text-muted-foreground">
-            Occupied: {occupied} spaces
+            Status: <span className="font-medium text-foreground">{statusText}</span>
+            {" · "}
+            Occupied: {occupiedSpots === null ? "—" : `${occupiedSpots} spaces`}
           </p>
         </div>
       </div>
 
-      {/*  Traffic Context */}
+      {/* Traffic Context */}
       {trafficSummary && (
         <div className="mb-6 rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between text-sm">
@@ -237,3 +277,4 @@ export const ParkingDetail = ({
     </Card>
   );
 };
+

@@ -1,4 +1,5 @@
 ﻿import React from "react";
+import { getLotCounts, hasLotCounts } from "@/utils/parking";
 
 export type ParkingLot = {
   id: string | number;
@@ -42,33 +43,22 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function normalizeStatus(status?: string) {
-  return String(status ?? "").trim().toLowerCase();
-}
-
 function trafficLabel(score: number) {
   if (score >= 70) return "High";
   if (score >= 40) return "Medium";
   return "Low";
 }
 
-function toInt(v: any, fallback = 0) {
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.trunc(n) : fallback;
-}
+// Availability levels:
+// >=60 Available, 30..59 Moderate, <30 Busy, 0 Full, null Unknown
+type UiLevel = "unknown" | "full" | "busy" | "moderate" | "available";
 
-/**
- * Supports both:
- * - conf as 0..100 (e.g. 82)
- * - conf/confidence as 0..1 (e.g. 0.82)
- */
-function normalizeConf(lot: ParkingLot): number {
-  const raw = Number(lot.conf ?? lot.confidence ?? 0);
-  if (!Number.isFinite(raw)) return 0;
-  // if it's 0..1 convert to percent
-  if (raw > 0 && raw <= 1) return Math.round(raw * 100);
-  // else assume already percent
-  return Math.round(raw);
+function getUiLevel(availabilityPct: number | null): UiLevel {
+  if (availabilityPct === null) return "unknown";
+  if (availabilityPct <= 0) return "full";
+  if (availabilityPct < 30) return "busy";
+  if (availabilityPct < 60) return "moderate";
+  return "available";
 }
 
 export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
@@ -76,82 +66,83 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
 
   const name = lot.name ?? "Unknown Parking";
   const address = lot.address;
-
-  // ✅ show address first if exists (your request)
   const title = address?.trim() ? address : name;
 
-  const status = lot.status ?? "unknown";
-  const confPct = normalizeConf(lot);
+  const { free, total } = getLotCounts(lot as any);
+  const hasCounts = hasLotCounts(lot as any);
 
-  // Support both naming styles safely
-  const free = toInt(lot.free ?? lot.available ?? 0, 0);
-  const total = toInt(lot.total ?? lot.capacity ?? 0, 0);
+  const availabilityPct =
+    hasCounts && total > 0 ? clamp(Math.round((free / total) * 100), 0, 100) : null;
 
-  const s = normalizeStatus(status);
-  const pct = total > 0 ? clamp(Math.round((free / total) * 100), 0, 100) : 0;
+  const occupiedPct =
+    hasCounts && total > 0
+      ? clamp(Math.round(((total - free) / total) * 100), 0, 100)
+      : null;
 
-  const isAvailable = s === "available" || s === "open";
-  const isBusy = s === "busy" || s === "full";
-  const isClosed = s === "closed";
+  const level = getUiLevel(availabilityPct);
 
-  const statusLabel = isAvailable
-    ? "Available"
-    : isBusy
-    ? "Busy"
-    : isClosed
-    ? "Closed"
-    : "Unknown";
+  const statusLabel =
+    level === "unknown"
+      ? "No live data"
+      : level === "full"
+      ? "Full"
+      : level === "busy"
+      ? "Busy"
+      : level === "moderate"
+      ? "Moderate"
+      : "Available";
 
-  const theme = isAvailable
-    ? {
-        ring: "ring-emerald-500/25",
-        chip:
-          "bg-emerald-500/10 text-emerald-700 ring-emerald-600/25 " +
-          "dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-500/25",
-        bar: "bg-emerald-500",
-        glow:
-          "radial-gradient(700px circle at 20% 0%, rgba(16,185,129,0.18), transparent 45%)",
-        dot: "text-emerald-500 dark:text-emerald-300",
-      }
-    : isBusy
-    ? {
-        ring: "ring-amber-500/25",
-        chip:
-          "bg-amber-500/10 text-amber-800 ring-amber-600/25 " +
-          "dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-500/25",
-        bar: "bg-amber-500",
-        glow:
-          "radial-gradient(700px circle at 20% 0%, rgba(245,158,11,0.16), transparent 45%)",
-        dot: "text-amber-500 dark:text-amber-300",
-      }
-    : isClosed
-    ? {
-        ring: "ring-rose-500/25",
-        chip:
-          "bg-rose-500/10 text-rose-800 ring-rose-600/25 " +
-          "dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-500/25",
-        bar: "bg-rose-500",
-        glow:
-          "radial-gradient(700px circle at 20% 0%, rgba(244,63,94,0.16), transparent 45%)",
-        dot: "text-rose-500 dark:text-rose-300",
-      }
-    : {
-        ring: "ring-sky-500/20",
-        chip:
-          "bg-sky-500/10 text-sky-800 ring-sky-600/20 " +
-          "dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20",
-        bar: "bg-sky-500",
-        glow:
-          "radial-gradient(700px circle at 20% 0%, rgba(56,189,248,0.14), transparent 45%)",
-        dot: "text-sky-500 dark:text-sky-300",
-      };
+  // Themes for different availability levels:
+  // - available: parking-available
+  // - moderate: --parking-moderate (HSL)
+  // - busy/full: parking-busy
+  // - unknown: sky-500
+  const theme =
+    level === "available"
+      ? {
+          ring: "ring-parking-available/25",
+          chip: "bg-parking-available/10 text-parking-available ring-parking-available/25",
+          bar: "bg-parking-available",
+          glow:
+            "radial-gradient(700px circle at 20% 0%, hsl(var(--parking-available) / 0.18), transparent 45%)",
+          dot: "text-parking-available",
+        }
+      : level === "moderate"
+      ? {
+          ring: "ring-[hsl(var(--parking-moderate))/0.30]",
+          chip:
+            "bg-[hsl(var(--parking-moderate))/0.12] text-[hsl(var(--parking-moderate))] " +
+            "ring-[hsl(var(--parking-moderate))/0.25]",
+          bar: "bg-[hsl(var(--parking-moderate))]",
+          glow:
+            "radial-gradient(700px circle at 20% 0%, hsl(var(--parking-moderate) / 0.16), transparent 45%)",
+          dot: "text-[hsl(var(--parking-moderate))]",
+        }
+      : level === "busy" || level === "full"
+      ? {
+          ring: "ring-parking-busy/25",
+          chip: "bg-parking-busy/10 text-parking-busy ring-parking-busy/25",
+          bar: "bg-parking-busy",
+          glow:
+            "radial-gradient(700px circle at 20% 0%, hsl(var(--parking-busy) / 0.16), transparent 45%)",
+          dot: "text-parking-busy",
+        }
+      : {
+          ring: "ring-sky-500/20",
+          chip:
+            "bg-sky-500/10 text-sky-800 ring-sky-600/20 " +
+            "dark:bg-sky-500/10 dark:text-sky-200 dark:ring-sky-500/20",
+          bar: "bg-sky-500",
+          glow:
+            "radial-gradient(700px circle at 20% 0%, rgba(56,189,248,0.14), transparent 45%)",
+          dot: "text-sky-500 dark:text-sky-300",
+        };
 
   const handleClick = () => onClick?.(lot);
 
-  // Traffic info (safe defaults)
   const cameraCount = trafficSummary?.nearbyCameraCount ?? 0;
   const eventCount = trafficSummary?.nearbyEventCount ?? 0;
-  const trafficScore = trafficSummary?.disruptionScore ?? 0;
+  const trafficScore = clamp(trafficSummary?.disruptionScore ?? 0, 0, 100);
   const priority = trafficSummary?.maxPriority ?? "NONE";
   const trafficLevel = trafficLabel(trafficScore);
 
@@ -186,20 +177,13 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
             <span className={`text-lg leading-none ${theme.dot}`}>●</span>
 
             <h3
-              className="
-                text-base font-semibold text-foreground
-                line-clamp-2
-                whitespace-normal
-                break-words
-                min-h-[2.5rem]
-              "
+              className="text-base font-semibold text-foreground line-clamp-2 whitespace-normal break-words min-h-[2.5rem]"
               title={title}
             >
               {title}
             </h3>
           </div>
 
-          {/* Optional: show the original name under address */}
           {address?.trim() ? (
             <div className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
               {name}
@@ -209,17 +193,23 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full bg-black/5 px-2.5 py-1 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
               <span className="opacity-70">Free</span>{" "}
-              <span className="font-semibold text-foreground">{free}</span>
+              <span className="font-semibold text-foreground">
+                {hasCounts ? free : "—"}
+              </span>
             </span>
 
             <span className="rounded-full bg-black/5 px-2.5 py-1 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
               <span className="opacity-70">Total</span>{" "}
-              <span className="font-semibold text-foreground">{total}</span>
+              <span className="font-semibold text-foreground">
+                {total && total > 0 ? total : "—"}
+              </span>
             </span>
 
             <span className="rounded-full bg-black/5 px-2.5 py-1 ring-1 ring-black/10 dark:bg-white/5 dark:ring-white/10">
-              <span className="opacity-70">Conf</span>{" "}
-              <span className="font-semibold text-foreground">{confPct}%</span>
+              <span className="opacity-70">Free%</span>{" "}
+              <span className="font-semibold text-foreground">
+                {availabilityPct === null ? "—" : `${availabilityPct}%`}
+              </span>
             </span>
           </div>
         </div>
@@ -237,14 +227,16 @@ export default function ParkingCard({ lot, onClick, trafficSummary }: Props) {
 
       <div className="relative mt-4">
         <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Availability</span>
-          <span className="font-semibold text-foreground/80">{pct}%</span>
+          <span>Occupied</span>
+          <span className="font-semibold text-foreground/80">
+            {occupiedPct === null ? "—" : `${occupiedPct}%`}
+          </span>
         </div>
 
         <div className="h-2 w-full overflow-hidden rounded-full bg-black/10 ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/10">
           <div
             className="h-full rounded-full transition-all duration-300"
-            style={{ width: `${pct}%` }}
+            style={{ width: `${occupiedPct === null ? 0 : occupiedPct}%` }}
           >
             <div className={`h-full w-full ${theme.bar}`} />
           </div>

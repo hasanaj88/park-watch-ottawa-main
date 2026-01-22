@@ -1,41 +1,67 @@
+// src/types/parking.ts
+
+//  status type
 export type ParkingStatus = "available" | "busy";
 
+// coordinates
 export interface ParkingCoordinates {
   lat: number;
   lng: number;
 }
 
+// pricing
 export interface ParkingPricing {
   rate: string;
   maxStay: string;
   openUntil: string;
 }
 
+/**
+ * Unified lot shape used across:
+ * - parking_app_view (map_capacity/map_available/map_data_mode/...)
+ * - legacy parking_lots table (capacity/available/...)
+ * - computed/virtual lots (free/occupied calculated locally)
+ */
 export interface ParkingLot {
+  lot: any; // raw row
+
   id: string;
   name: string;
 
-  // Legacy/required UI fields
-  capacity: number;
-  occupied: number;
-  status: ParkingStatus;
+  // ---- Capacity / counts ----
+  capacity?: number;
+  total?: number;
+  free?: number | null;
+  occupied?: number | null;
 
-  confidence: number;
+  // ---- Status / confidence ----
+  status?: ParkingStatus;
+  confidence?: number;
+  conf?: number;
 
-  address: string;
-  coordinates: ParkingCoordinates;
+  // ---- UI meta ----
+  address?: string;
+  coordinates?: ParkingCoordinates;
 
-  pricing: ParkingPricing;
+  pricing?: ParkingPricing;
   amenities?: string[];
 
-  lastUpdated: Date;
+  lastUpdated?: Date;
   distanceKm?: number;
 
-  // Supabase-compatible aliases (optional)
-  total?: number;
-  free?: number;
-  conf?: number;
+  // ---- parking_app_view fields ----
+  map_capacity?: number | null;
+  map_available?: number | null;
+  map_status?: string | null;
+  map_updated_at?: string | Date | null;
+  map_data_mode?: string | null; // ✅ مهم
+
+  // ---- extras ----
+  hasLiveData?: boolean;
+  estimateSource?: "live" | "virtual" | "heuristic";
+  ottawa_lot_id?: string | null;
 }
+
 
 export interface ParkingFilters {
   query: string;
@@ -48,4 +74,3 @@ export interface MapPin {
   position: { x: number; y: number };
   lot: ParkingLot;
 }
-

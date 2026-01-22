@@ -9,17 +9,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getLotCounts } from "@/utils/parking";
 
-import { getLotCounts } from "@/utils/parkingLot";
-
+/* =========================
+   Types & helpers
+========================= */
 interface ParkingSpace {
   id: string;
   isOccupied: boolean;
   type: "standard" | "disabled" | "electric" | "compact";
-}
-
-interface ParkingLotDetailMapProps {
-  lot: ParkingLot;
 }
 
 function spaceTypeLabel(type: ParkingSpace["type"]) {
@@ -41,7 +39,6 @@ function freePctTheme(freePct: number) {
       pill:
         "bg-emerald-500/10 text-emerald-700 ring-emerald-600/25 " +
         "dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-500/25",
-      text: "text-emerald-600",
       label: "Good",
     };
   }
@@ -50,7 +47,6 @@ function freePctTheme(freePct: number) {
       pill:
         "bg-amber-500/10 text-amber-800 ring-amber-600/25 " +
         "dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-500/25",
-      text: "text-amber-600",
       label: "Moderate",
     };
   }
@@ -58,11 +54,13 @@ function freePctTheme(freePct: number) {
     pill:
       "bg-rose-500/10 text-rose-800 ring-rose-600/25 " +
       "dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-500/25",
-    text: "text-rose-600",
     label: "Busy",
   };
 }
 
+/* =========================
+   Deterministic layout
+========================= */
 function hashToSeed(str: string) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -82,27 +80,24 @@ function mulberry32(seed: number) {
   };
 }
 
-const generateParkingSpaces = (lot: ParkingLot): ParkingSpace[] => {
+const generateParkingSpaces = (lot: ParkingLot, capacity: number, occupied: number): ParkingSpace[] => {
+  if (capacity <= 0) return [];
+
   const spaces: ParkingSpace[] = [];
-  const { total: capacity, occupied } = getLotCounts(lot);
-
-  const totalSpaces = Math.max(0, capacity);
-  const occ = Math.max(0, Math.min(occupied, totalSpaces));
-
-  const seed = hashToSeed(String(lot.id ?? "lot"));
+  const seed = hashToSeed(String((lot as any).id ?? (lot as any).map_id ?? "0"));
   const rand = mulberry32(seed);
 
-  const indices = Array.from({ length: totalSpaces }, (_, i) => i);
+  // shuffled indices to place occupied spots deterministically
+  const indices = Array.from({ length: capacity }, (_, i) => i);
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
 
+  const occ = Math.max(0, Math.min(occupied, capacity));
   const occupiedSet = new Set(indices.slice(0, occ));
 
-  for (let i = 0; i < totalSpaces; i++) {
-    const isOccupied = occupiedSet.has(i);
-
+  for (let i = 0; i < capacity; i++) {
     const type: ParkingSpace["type"] =
       i === 0
         ? "disabled"
@@ -114,7 +109,7 @@ const generateParkingSpaces = (lot: ParkingLot): ParkingSpace[] => {
 
     spaces.push({
       id: `space-${i}`,
-      isOccupied,
+      isOccupied: occupiedSet.has(i),
       type,
     });
   }
@@ -124,7 +119,6 @@ const generateParkingSpaces = (lot: ParkingLot): ParkingSpace[] => {
 
 const getSpaceTypeColor = (type: ParkingSpace["type"], isOccupied: boolean) => {
   if (isOccupied) return "bg-red-500/80 border-red-600";
-
   switch (type) {
     case "disabled":
       return "bg-blue-500/80 border-blue-600";
@@ -150,210 +144,149 @@ const getSpaceTypeIcon = (type: ParkingSpace["type"]) => {
   }
 };
 
-export const ParkingLotDetailMap = ({ lot }: ParkingLotDetailMapProps) => {
+/* =========================
+   Component
+========================= */
+export const ParkingLotDetailMap = ({ lot }: { lot: ParkingLot }) => {
   const device = useDeviceMode();
 
-  const { total: capacity, occupied, free: availableSpaces } = getLotCounts(lot);
+  // getLotCounts supports both live and estimated lots (if enhancedLots added free/total)
+  const counts = getLotCounts(lot as any);
 
-  const spaces = useMemo(() => generateParkingSpaces(lot), [
-    lot?.id,
-    (lot as any)?.capacity,
-    (lot as any)?.total,
-    (lot as any)?.occupied,
-    (lot as any)?.free,
-    (lot as any)?.available,
-  ]);
+  const capacity = Number(counts.total ?? 0);
 
-  const totalSpaces = spaces.length;
+  const free =
+    typeof counts.free === "number" && Number.isFinite(counts.free)
+      ? counts.free
+      : null;
 
-  const density = device === "mobile" ? 0.55 : device === "tablet" ? 0.9 : 1.3;
+  // occupied: if missing, derive from capacity - free (works for estimated too)
+  const occupied =
+    typeof counts.occupied === "number" && Number.isFinite(counts.occupied)
+      ? counts.occupied
+      : free !== null
+      ? Math.max(0, capacity - free)
+      : null;
 
-  const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * density)) : 1;
-  const rows = totalSpaces > 0 ? Math.ceil(totalSpaces / cols) : 1;
+  const hasLive = capacity > 0 && free !== null && occupied !== null;
 
-  const freePct = capacity > 0 ? Math.round((availableSpaces / capacity) * 100) : 0;
+  const availableSpaces = hasLive ? free : 0;
+  const freePct = hasLive ? Math.round((availableSpaces / capacity) * 100) : 0;
   const pctTheme = freePctTheme(freePct);
 
-  const canRenderLayout = Number.isFinite(capacity) && capacity > 0 && totalSpaces > 0;
+  const spaces = useMemo(() => {
+    if (!hasLive) return [];
+    return generateParkingSpaces(lot, capacity, occupied!);
+  }, [hasLive, (lot as any).id, (lot as any).map_id, capacity, occupied]);
+
+  const totalSpaces = spaces.length;
+  const canRenderLayout = hasLive && totalSpaces > 0;
+
+  const density = device === "mobile" ? 0.55 : device === "tablet" ? 0.9 : 1.3;
+  const cols = totalSpaces > 0 ? Math.ceil(Math.sqrt(totalSpaces * density)) : 1;
+  const rows = totalSpaces > 0 ? Math.ceil(totalSpaces / cols) : 1;
 
   const cellH = device === "mobile" ? "h-8" : device === "tablet" ? "h-10" : "h-12";
   const cellRadius = device === "mobile" ? "rounded-lg" : "rounded-md";
   const gridPadding = device === "mobile" ? "p-3" : "p-6";
-
   const enableTooltip = device === "desktop";
 
-  const hoverScale = device === "desktop" ? "hover:scale-105" : "";
-
-  const SpaceCell = ({
-  space,
-  index,
-  title,
-}: {
-  space: ParkingSpace;
-  index: number;
-  title?: string;
-}) => {
-  return (
+  const SpaceCell = ({ space }: { space: ParkingSpace }) => (
     <div
-      className={`
-        relative ${cellH} ${cellRadius} border-2 transition-all duration-200 ${hoverScale} cursor-pointer
-        flex items-center justify-center text-white shadow-sm
-        ${getSpaceTypeColor(space.type, space.isOccupied)}
-      `}
-      aria-label={title ?? `Parking space`}
-      title={title}
+      className={`relative ${cellH} ${cellRadius} border-2 flex items-center justify-center text-white shadow-sm
+        ${getSpaceTypeColor(space.type, space.isOccupied)}`}
     >
-      {/* Icon only */}
       {device !== "mobile" && (
         <span className="text-lg">
-          {space.isOccupied ? (
-            <Car className="h-3 w-3" />
-          ) : (
-            getSpaceTypeIcon(space.type)
-          )}
+          {space.isOccupied ? <Car className="h-3 w-3" /> : getSpaceTypeIcon(space.type)}
         </span>
       )}
     </div>
   );
-};
-
 
   return (
     <TooltipProvider delayDuration={80}>
-      <Card className="p-6 bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 border-2">
+      <Card className="p-6 border-2">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <MapPin className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-lg font-semibold truncate">{lot.name}</h3>
+            <MapPin className="h-5 w-5 text-primary" />
+            <div>
+              <h3 className="text-lg font-semibold truncate">{(lot as any).name ?? "Parking Lot"}</h3>
               <p className="text-sm text-muted-foreground">Detailed Parking Layout</p>
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-xl sm:text-2xl font-bold text-green-600">
-              {availableSpaces}
+            <div className="text-xl font-bold text-green-600">
+              {hasLive ? availableSpaces : "—"}
             </div>
-            <div className="text-xs text-muted-foreground">available</div>
+            <div className="text-xs text-muted-foreground">
+              {hasLive ? "available" : "no live data"}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg border">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500/80 border border-green-600 rounded" />
-            <span className="text-xs">Available</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500/80 border border-red-600 rounded" />
-            <span className="text-xs">Occupied</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-500/80 border border-blue-600 rounded" />
-            <span className="text-xs">Disabled ♿</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-500/80 border border-yellow-600 rounded" />
-            <span className="text-xs">Electric ⚡</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-purple-500/80 border border-purple-600 rounded" />
-            <span className="text-xs">Compact</span>
-          </div>
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-3 mb-6 p-4 rounded-lg border">
+          <span
+            className={[
+              "rounded-full px-3 py-1 text-xs font-semibold ring-1",
+              pctTheme.pill,
+            ].join(" ")}
+          >
+            {hasLive ? `Free ${freePct}% · ${pctTheme.label}` : "No live data"}
+          </span>
 
-          <div className="ml-auto flex items-center gap-2">
-            <span
-              className={[
-                "rounded-full px-3 py-1 text-xs font-semibold ring-1",
-                pctTheme.pill,
-              ].join(" ")}
-              title="Free percentage based on (available / total)"
-            >
-              Free {freePct}% · {pctTheme.label}
+          {/* Optional badge (shows if estimated) */}
+          {(lot as any).dataQuality === "ESTIMATED" && (
+            <span className="text-xs text-muted-foreground">
+              • Estimated
             </span>
-          </div>
+          )}
+          {(lot as any).dataQuality === "API" && (
+            <span className="text-xs text-muted-foreground">
+              • API
+            </span>
+          )}
         </div>
 
         {!canRenderLayout ? (
-          <div className="rounded-xl border border-dashed border-gray-300 dark:border-slate-600 bg-gray-200/20 dark:bg-slate-700/20 p-6 text-center">
-            <div className="text-sm font-semibold text-foreground">Layout not available</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Capacity is missing or zero for this lot.
-            </div>
+          <div className="p-6 text-center text-sm text-muted-foreground border border-dashed rounded-xl">
+            Live availability data not available for this lot.
           </div>
         ) : (
           <div
-            className={`grid gap-2 ${gridPadding} bg-gray-200/30 dark:bg-slate-700/30 rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 relative`}
+            className={`grid gap-2 ${gridPadding} rounded-xl border-2 border-dashed relative`}
             style={{
               gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
               gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
             }}
           >
-            <div className="absolute inset-0 opacity-20">
-              <div
-                className="w-full h-full"
-                style={{
-                  backgroundImage: `
-                    linear-gradient(90deg, transparent 0%, transparent 45%, #666 45%, #666 55%, transparent 55%, transparent 100%),
-                    linear-gradient(0deg, transparent 0%, transparent 45%, #666 45%, #666 55%, transparent 55%, transparent 100%)
-                  `,
-                  backgroundSize: `${100 / cols}% ${100 / rows}%`,
-                }}
-              />
-            </div>
-
             {spaces.map((space, index) => {
-              const typeLabel = spaceTypeLabel(space.type);
-              const stateLabel = space.isOccupied ? "Occupied" : "Available";
-              const title = `Space ${index + 1} — ${stateLabel} (${typeLabel})`;
+              const title = `Space ${index + 1} — ${
+                space.isOccupied ? "Occupied" : "Available"
+              } (${spaceTypeLabel(space.type)})`;
 
               if (!enableTooltip) {
-                return <SpaceCell key={space.id} space={space} index={index} title={title} />;
+                return <SpaceCell key={space.id} space={space} />;
               }
 
               return (
                 <Tooltip key={space.id}>
                   <TooltipTrigger asChild>
                     <div>
-                      <SpaceCell space={space} index={index} />
+                      <SpaceCell space={space} />
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="top" align="center">
-                    <div className="text-xs">
-                      <div className="font-semibold">
-                        Space {index + 1} — {stateLabel}
-                      </div>
-                      <div className="opacity-80">{typeLabel}</div>
-                    </div>
+                  <TooltipContent>
+                    <div className="text-xs">{title}</div>
                   </TooltipContent>
                 </Tooltip>
               );
             })}
           </div>
         )}
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-          <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <div className="text-lg font-bold text-green-600">{availableSpaces}</div>
-            <div className="text-xs text-muted-foreground">Available</div>
-          </div>
-
-          <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <div className="text-lg font-bold text-red-600">{occupied}</div>
-            <div className="text-xs text-muted-foreground">Occupied</div>
-          </div>
-
-          <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <div className="text-lg font-bold text-blue-600">{capacity}</div>
-            <div className="text-xs text-muted-foreground">Total</div>
-          </div>
-
-          <div className="text-center p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-            <div className={`text-lg font-bold ${pctTheme.text}`}>{freePct}%</div>
-            <div className="text-xs text-muted-foreground">Free</div>
-          </div>
-        </div>
       </Card>
     </TooltipProvider>
   );
