@@ -4,9 +4,11 @@ import { getLotCounts, hasLotCounts } from "@/utils/parking";
 
 type Weather = { temp: number; rain: boolean; snow: boolean };
 
-// VITE_API_BASE_URL in .env
+// Uses VITE_API_BASE_URL in production.
+// Uses localhost only in DEV to avoid CORS issues on Vercel.
 const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL?.toString() || "http://localhost:3001";
+  (import.meta as any).env?.VITE_API_BASE_URL?.toString() ||
+  (import.meta.env.DEV ? "http://localhost:3001" : "");
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -18,13 +20,13 @@ function getTimeCongestionScore(date = new Date()): number {
 
   let score = 40;
 
-  if (hour >= 7 && hour <= 9) score += 25;      // Morning peak
-  if (hour >= 15 && hour <= 18) score += 30;    // Afternoon peak
+  if (hour >= 7 && hour <= 9) score += 25; // Morning peak
+  if (hour >= 15 && hour <= 18) score += 30; // Afternoon peak
 
-  if (day >= 1 && day <= 4) score += 10;        // Mon–Thu
-  if (day === 0 || day === 6) score -= 10;      // Weekend
+  if (day >= 1 && day <= 4) score += 10; // Mon–Thu
+  if (day === 0 || day === 6) score -= 10; // Weekend
 
-  if (hour >= 22 || hour <= 5) score -= 15;     // Late night
+  if (hour >= 22 || hour <= 5) score -= 15; // Late night
 
   return clamp(score, 0, 100);
 }
@@ -47,6 +49,10 @@ export function useEnhancedLots(lots: ParkingLot[]) {
   const [weather, setWeather] = useState<Weather | null>(null);
 
   useEffect(() => {
+    // If no backend base URL is available (common in PROD without env),
+    // skip weather fetch to avoid calling localhost and triggering CORS errors.
+    if (!API_BASE) return;
+
     const controller = new AbortController();
 
     const loadWeather = async () => {
@@ -63,7 +69,6 @@ export function useEnhancedLots(lots: ParkingLot[]) {
       }
     };
 
-    
     loadWeather();
 
     // Update weather every 10 minutes
@@ -89,12 +94,12 @@ export function useEnhancedLots(lots: ParkingLot[]) {
         return { ...lot, dataQuality: "API" as const };
       }
 
-      //  2) If already has live counts: unchanged
+      // 2) If already has live counts: unchanged
       if (hasLotCounts(lot)) {
         return { ...lot, dataQuality: "LIVE" as const };
       }
 
-      //  3) Virtual: compute estimated free/total
+      // 3) Virtual: compute estimated free/total
       const counts = getLotCounts(lot);
       const capacity = Number(counts.total ?? lot.capacity ?? lot.map_capacity ?? 0);
 
