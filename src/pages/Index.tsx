@@ -35,8 +35,10 @@ const Index = () => {
   // Enhance only virtual (weather-based) on top of the base lots list.
   const { enhancedLots } = useEnhancedLots(lots ?? []);
 useEffect(() => {
-  console.log("ENV CHECK -> VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL);
-  console.log("ENV CHECK -> VITE_SUPABASE_URL:", import.meta.env.VITE_SUPABASE_URL);
+  alert("Index.tsx loaded on Vercel");
+  console.log("🔥 ENV CHECK 🔥");
+  console.log("VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL);
+  console.log("VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
 }, []);
 
   // Choose the best list to render across the whole page.
