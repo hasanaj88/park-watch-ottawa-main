@@ -1,3 +1,5 @@
+// src/services/trafficDataProvider.ts
+
 import { fetchCameras, fetchEvents } from "./trafficApi";
 import { fetchParkingLots } from "./parkingApi";
 import { USE_API } from "@/config/dataMode";
@@ -19,10 +21,25 @@ function isRest404(err: unknown) {
   return msg.includes("REST 404") || msg.includes("status of 404") || msg.includes(" 404 ");
 }
 
+/**
+ * Ensure mock lots match the ParkingLot shape expected by the app.
+ * Some typings require a "lot" property (used in different parts of the UI).
+ */
+function toTypedMockLots(): ParkingLot[] {
+  return (MOCK_PARKING_LOTS as any[]).map((x) => ({
+    lot: x, // required by typing in your project
+    ...x,
+  })) as ParkingLot[];
+}
+
 export async function getAllParkingData(): Promise<ParkingDataBundle> {
   // Use mock data if configured
   if (!USE_API) {
-    return { lots: MOCK_PARKING_LOTS, cameras: MOCK_CAMERAS, events: MOCK_EVENTS };
+    return {
+      lots: toTypedMockLots(),
+      cameras: MOCK_CAMERAS as any,
+      events: MOCK_EVENTS as any,
+    };
   }
 
   try {
@@ -37,10 +54,13 @@ export async function getAllParkingData(): Promise<ParkingDataBundle> {
     // handle Supabase REST 404 errors by falling back to mock data
     if (isRest404(err)) {
       console.warn("Supabase REST 404 → falling back to mock data:", err);
-      return { lots: MOCK_PARKING_LOTS, cameras: MOCK_CAMERAS, events: MOCK_EVENTS };
+      return {
+        lots: toTypedMockLots(),
+        cameras: MOCK_CAMERAS as any,
+        events: MOCK_EVENTS as any,
+      };
     }
 
-    // re-throw other errors
     throw err;
   }
 }
