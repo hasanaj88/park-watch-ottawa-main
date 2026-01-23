@@ -1,5 +1,5 @@
 ﻿// src/pages/Index.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParkingLots } from "@/hooks/useParkingLots";
 import { useEnhancedLots } from "@/hooks/useEnhancedLots";
 import { openGoogleMapsNavigation } from "@/utils/navigation";
@@ -16,9 +16,6 @@ import AIChat from "@/components/AIChat";
 import ParkingCardsList from "@/components/parking/ParkingCardsList";
 import type { ParkingLot } from "@/types/parking";
 
-console.log("✅ Index.tsx module loaded");
-console.log("✅ ENV VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL);
-console.log("✅ ENV VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
 
 const Index = () => {
   const {
@@ -38,12 +35,7 @@ const Index = () => {
 
   // Enhance only virtual (weather-based) on top of the base lots list.
   const { enhancedLots } = useEnhancedLots(lots ?? []);
-useEffect(() => {
-  alert("Index.tsx loaded on Vercel");
-  console.log("🔥 ENV CHECK 🔥");
-  console.log("VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL);
-  console.log("VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
-}, []);
+
 
   // Choose the best list to render across the whole page.
   const displayLots = useMemo(() => {
@@ -118,124 +110,116 @@ useEffect(() => {
     selectLot(String(lot.id));
     setActiveTab("overview");
   };
+return (
+  <div className="app-parking-bg">
+    <div className="app-content min-h-screen">
+      <ParkingHeader
+        onRefresh={refreshData}
+        isLoading={isLoading}
+        onFindNearby={(nearbyLots) => {
+          const first = nearbyLots?.[0];
+          const firstId = first?.id;
+          if (firstId) {
+            selectLot(String(firstId));
+            setActiveTab("overview");
+          }
+        }}
+        allLots={allLots}
+      />
 
-  return (
-    <div className="app-parking-bg">
-      <div className="app-content min-h-screen">
-      <div className="mx-4 my-2 p-3 rounded-md text-xs border bg-black/30 text-white">
-  <div>ENV CHECK:</div>
-  <div>VITE_API_BASE_URL = {String(import.meta.env.VITE_API_BASE_URL)}</div>
-  <div>VITE_SUPABASE_URL = {String(import.meta.env.VITE_SUPABASE_URL)}</div>
-</div>
+      <main className="container mx-auto px-4 py-6 pb-24">
+        <ParkingControls filters={filters} onFiltersChange={updateFilters} />
 
-        <ParkingHeader
-          onRefresh={refreshData}
-          isLoading={isLoading}
-          onFindNearby={(nearbyLots) => {
-            const first = nearbyLots?.[0];
-            const firstId = first?.id;
-            if (firstId) {
-              selectLot(String(firstId));
-              setActiveTab("overview");
-            }
-          }}
-          allLots={allLots}
-        />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="overview">Parking Overview</TabsTrigger>
+            <TabsTrigger value="search">Search Locations</TabsTrigger>
+            <TabsTrigger value="cards">Cards</TabsTrigger>
+          </TabsList>
 
-        <main className="container mx-auto px-4 py-6 pb-24">
-          <ParkingControls filters={filters} onFiltersChange={updateFilters} />
+          <TabsContent value="overview" className="space-y-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                {selectedLotId && (
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={clearSelectedLot}
+                      className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors flex items-center gap-2"
+                      aria-label="Back to overview"
+                    >
+                      <span className="mr-2">&larr;</span>
+                      Back to Overview
+                    </button>
+                  </div>
+                )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="overview">Parking Overview</TabsTrigger>
-              <TabsTrigger value="search">Search Locations</TabsTrigger>
-              <TabsTrigger value="cards">Cards</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-0">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  {selectedLotId && (
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={clearSelectedLot}
-                        className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors flex items-center gap-2"
-                        aria-label="Back to overview"
-                      >
-                        <span className="mr-2">&larr;</span>
-                        Back to Overview
-                      </button>
-                    </div>
-                  )}
-
-                  {selectedLotEnhanced ? (
-                    <ParkingLotDetailMap lot={selectedLotEnhanced} />
-                  ) : (
-                    <ParkingMap
-                      lots={displayLots}
-                      selectedLotId={selectedLotId}
-                      onLotSelect={selectLot}
-                    />
-                  )}
-                </div>
-
-                <div className="space-y-6">
-                  {selectedLotEnhanced && (
-                    <ParkingDetail
-                      lot={selectedLotEnhanced}
-                      availabilityPercentage={getAvailabilityPercentage(selectedLotEnhanced)}
-                      onNavigate={handleNavigate}
-                    />
-                  )}
-
-                  <ParkingList
+                {selectedLotEnhanced ? (
+                  <ParkingLotDetailMap lot={selectedLotEnhanced} />
+                ) : (
+                  <ParkingMap
                     lots={displayLots}
-                    selectedLotId={String(selectedLotId ?? "")}
+                    selectedLotId={selectedLotId}
                     onLotSelect={selectLot}
                   />
-                </div>
+                )}
               </div>
-            </TabsContent>
 
-            <TabsContent value="search" className="space-y-0">
-              <SearchResults
-                onSearch={searchLots}
-                onLotSelect={(lotId) => {
-                  selectLot(String(lotId));
-                  setActiveTab("overview");
-                }}
-                onNavigate={handleNavigate}
-              />
-            </TabsContent>
-
-            <TabsContent value="cards" className="space-y-0">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                  <ParkingCardsList
-                    lots={cardsLots}
-                    isLoading={isLoading}
-                    error={error ?? null}
-                    availableOnly={availableOnly}
-                    onCardClick={handleCardClick}
+              <div className="space-y-6">
+                {selectedLotEnhanced && (
+                  <ParkingDetail
+                    lot={selectedLotEnhanced}
+                    availabilityPercentage={getAvailabilityPercentage(selectedLotEnhanced)}
+                    onNavigate={handleNavigate}
                   />
-                </div>
+                )}
+
+                <ParkingList
+                  lots={displayLots}
+                  selectedLotId={String(selectedLotId ?? "")}
+                  onLotSelect={selectLot}
+                />
               </div>
-            </TabsContent>
-          </Tabs>
-        </main>
-
-        <footer className="fixed bottom-0 left-0 right-0 glass-effect border-t z-40">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div>© Ottawa Live Parking 2025</div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="search" className="space-y-0">
+            <SearchResults
+              onSearch={searchLots}
+              onLotSelect={(lotId) => {
+                selectLot(String(lotId));
+                setActiveTab("overview");
+              }}
+              onNavigate={handleNavigate}
+            />
+          </TabsContent>
+
+          <TabsContent value="cards" className="space-y-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <ParkingCardsList
+                  lots={cardsLots}
+                  isLoading={isLoading}
+                  error={error ?? null}
+                  availableOnly={availableOnly}
+                  onCardClick={handleCardClick}
+                />
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      <footer className="fixed bottom-0 left-0 right-0 glass-effect border-t z-40">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div>© Ottawa Live Parking 2025</div>
           </div>
-        </footer>
+        </div>
+      </footer>
 
-        <AIChat />
-      </div>
+      <AIChat />
     </div>
-  );
+  </div>
+);
 };
-
 export default Index;
