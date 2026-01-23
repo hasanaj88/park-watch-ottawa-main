@@ -16,6 +16,10 @@ import AIChat from "@/components/AIChat";
 import ParkingCardsList from "@/components/parking/ParkingCardsList";
 import type { ParkingLot } from "@/types/parking";
 
+console.log("✅ Index.tsx module loaded");
+console.log("✅ ENV VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL);
+console.log("✅ ENV VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
+
 const Index = () => {
   const {
     lots,
