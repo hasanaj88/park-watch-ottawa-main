@@ -122,6 +122,12 @@ useEffect(() => {
   return (
     <div className="app-parking-bg">
       <div className="app-content min-h-screen">
+      <div className="mx-4 my-2 p-3 rounded-md text-xs border bg-black/30 text-white">
+  <div>ENV CHECK:</div>
+  <div>VITE_API_BASE_URL = {String(import.meta.env.VITE_API_BASE_URL)}</div>
+  <div>VITE_SUPABASE_URL = {String(import.meta.env.VITE_SUPABASE_URL)}</div>
+</div>
+
         <ParkingHeader
           onRefresh={refreshData}
           isLoading={isLoading}
