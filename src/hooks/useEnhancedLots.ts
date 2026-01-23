@@ -5,10 +5,12 @@ import { getLotCounts, hasLotCounts } from "@/utils/parking";
 type Weather = { temp: number; rain: boolean; snow: boolean };
 
 // Uses VITE_API_BASE_URL in production.
-// Uses localhost only in DEV to avoid CORS issues on Vercel.
-const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL?.toString() ||
-  (import.meta.env.DEV ? "http://localhost:3001" : "");
+// Uses localhost only in DEV.
+const isDev = import.meta.env.DEV === true;
+
+const API_BASE: string = isDev
+  ? "http://localhost:3001"
+  : (import.meta.env.VITE_API_BASE_URL ?? "").toString();
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -49,8 +51,8 @@ export function useEnhancedLots(lots: ParkingLot[]) {
   const [weather, setWeather] = useState<Weather | null>(null);
 
   useEffect(() => {
-    // If no backend base URL is available (common in PROD without env),
-    // skip weather fetch to avoid calling localhost and triggering CORS errors.
+    // In production, if no backend base URL is available, skip weather fetch
+    // to avoid calling localhost and triggering CORS/deploy issues.
     if (!API_BASE) return;
 
     const controller = new AbortController();
