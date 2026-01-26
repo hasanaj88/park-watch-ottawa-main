@@ -102,8 +102,8 @@ export const ParkingDetail = ({
       : Math.max(0, capacity - availableSpots);
 
   // confidence
-  const rawConf = safeNumber((lot as any).confidence ?? (lot as any).conf, 0);
-  const confPct = clamp(Math.round(rawConf > 1 ? rawConf : rawConf * 100), 0, 100);
+  //const rawConf = safeNumber((lot as any).confidence ?? (lot as any).conf, 0);
+  //const confPct = clamp(Math.round(rawConf > 1 ? rawConf : rawConf * 100), 0, 100);
 
   const pricing = (lot as any).pricing ?? {};
   const maxStay = pricing?.maxStay ?? "—";
@@ -147,8 +147,6 @@ export const ParkingDetail = ({
             <StatusIcon className="h-3 w-3" />
             {pct === null ? "No data" : `${pct}% free`}
           </Badge>
-
-          <span className="text-xs text-muted-foreground">conf {confPct}%</span>
         </div>
       </div>
 

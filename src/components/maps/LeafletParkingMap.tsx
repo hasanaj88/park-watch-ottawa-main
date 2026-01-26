@@ -20,7 +20,7 @@ export default function LeafletParkingMap({ lots, selectedLotId, onLotSelect }: 
         />
 
         {lots.map((lot) => {
-          // إذا عندك lot.lat / lot.lng استخدمهم. إذا ما موجودين، نخليها كلها Ottawa مؤقتًا.
+          // Fallback to Ottawa center if no coordinates are provided
           const lat = (lot as any).lat ?? ottawa[0];
           const lng = (lot as any).lng ?? ottawa[1];
           const pos: [number, number] = [lat, lng];
