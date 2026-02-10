@@ -1,27 +1,12 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Google Analytics (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TFEKS146WQ"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-TFEKS146WQ');
-    </script>
-
-    <!-- Google AdSense -->
-    <script
-      async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-885210663579120"
-      crossorigin="anonymous">
-    </script>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>Ottawa Live Parking - Real-time Parking Status</title>
 
+    <!-- SEO Meta Tags -->
     <meta
       name="description"
       content="Real-time parking availability in Ottawa with live camera data. Find available parking spots with live updates and navigation."
@@ -29,12 +14,13 @@
     <meta name="author" content="Ottawa Live Parking" />
     <meta
       name="keywords"
-      content="Ottawa parking, live parking, parking availability, Ottawa downtown parking, real-time parking"
+      content="Ottawa parking, live parking, parking availability, downtown Ottawa parking, real-time parking, parking map, parking spots"
     />
 
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/parking.svg" />
 
-    <!-- Open Graph -->
+    <!-- Open Graph / Social Sharing -->
     <meta property="og:title" content="Ottawa Live Parking - Real-time Parking Status" />
     <meta
       property="og:description"
@@ -45,10 +31,32 @@
     <!-- Twitter -->
     <meta name="twitter:title" content="Ottawa Live Parking - Real-time Parking Status" />
     <meta name="twitter:description" content="Find available parking in Ottawa with real-time updates" />
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="preconnect" href="https://pagead2.googlesyndication.com">
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TFEKS146WQ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-TFEKS146WQ', { 'anonymize_ip': true });
+    </script>
+
+    <!-- Google AdSense -->
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-885210663579120"
+      crossorigin="anonymous">
+    </script>
   </head>
 
   <body>
     <div id="root"></div>
+    
+    <!-- Main React / TypeScript Entry -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
