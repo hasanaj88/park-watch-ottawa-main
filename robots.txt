@@ -1,0 +1,30 @@
+# Allow major search engine crawlers for optimal visibility
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Explicitly allow major social media platform bots to ensure rich previews
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Pinterestbot
+Allow: /
+
+User-agent: Redditbot
+Allow: /
+
+# Catch-all for any other crawlers, including less common social media bots
+# and general web crawlers, ensuring full access by default.
+User-agent: *
+Allow: /
+
+# Specify the location of your sitemap for better content discovery
+Sitemap: https://ottawaliveparking.web.app/sitemap.xml

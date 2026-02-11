@@ -1,0 +1,74 @@
+# =====================
+# Logs
+# =====================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =====================
+# Dependencies & builds
+# =====================
+node_modules/
+dist/
+dist-ssr/
+build/
+
+# =====================
+# Environment files (DO NOT COMMIT)
+# =====================
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+.env.txt
+
+# =====================
+# Firebase / cloud local files
+# =====================
+.firebase/
+.firebaserc.local
+
+# =====================
+# Editor directories & OS files
+# =====================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =====================
+# Misc / temp files
+# =====================
+*.local
+*.tmp
+*.bak
+uui.txt
+# node
+node_modules/
+
+# server
+server/node_modules/
+server/.env
+server/.env.*
+
+# build
+dist/
+.vercel/
+.vercel
+.vscode/
+node_modules/
+dist/
+.env
+.env.*
+supabase/.temp/
