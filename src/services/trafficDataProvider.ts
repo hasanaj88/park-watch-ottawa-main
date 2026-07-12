@@ -14,32 +14,68 @@ export type ParkingDataBundle = {
   lots: ParkingLot[];
   cameras: Camera[];
   events: TrafficEvent[];
+  isCached?: boolean;
+  cachedAt?: string | null;
 };
 
-function isRest404(err: unknown) {
-  const msg = String((err as any)?.message ?? err ?? "");
-  return msg.includes("REST 404") || msg.includes("status of 404") || msg.includes(" 404 ");
+const FULL_CACHE_KEY = "ottawa_parking_last_full_data";
+
+function saveFullCache(data: ParkingDataBundle) {
+  if (data.lots.length > 0) {
+    localStorage.setItem(
+      FULL_CACHE_KEY,
+      JSON.stringify({
+        ...data,
+        isCached: false,
+        cachedAt: new Date().toISOString(),
+      })
+    );
+  }
 }
 
-/**
- * Ensure mock lots match the ParkingLot shape expected by the app.
- * Some typings require a "lot" property (used in different parts of the UI).
- */
+function readFullCache(): ParkingDataBundle | null {
+  try {
+    const raw = localStorage.getItem(FULL_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as ParkingDataBundle;
+
+    if (!Array.isArray(parsed.lots) || parsed.lots.length === 0) {
+      return null;
+    }
+
+    return {
+      lots: parsed.lots,
+      cameras: Array.isArray(parsed.cameras) ? parsed.cameras : [],
+      events: Array.isArray(parsed.events) ? parsed.events : [],
+      isCached: true,
+      cachedAt: parsed.cachedAt ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function toTypedMockLots(): ParkingLot[] {
   return (MOCK_PARKING_LOTS as any[]).map((x) => ({
-    lot: x, // required by typing in your project
+    lot: x,
     ...x,
   })) as ParkingLot[];
 }
 
+function getMockData(): ParkingDataBundle {
+  return {
+    lots: toTypedMockLots(),
+    cameras: MOCK_CAMERAS as any,
+    events: MOCK_EVENTS as any,
+    isCached: false,
+    cachedAt: null,
+  };
+}
+
 export async function getAllParkingData(): Promise<ParkingDataBundle> {
-  // Use mock data if configured
   if (!USE_API) {
-    return {
-      lots: toTypedMockLots(),
-      cameras: MOCK_CAMERAS as any,
-      events: MOCK_EVENTS as any,
-    };
+    return getMockData();
   }
 
   try {
@@ -49,21 +85,37 @@ export async function getAllParkingData(): Promise<ParkingDataBundle> {
       fetchEvents(),
     ]);
 
-    return { lots, cameras, events };
-  } catch (err) {
-    // handle Supabase REST 404 errors by falling back to mock data
-    if (isRest404(err)) {
-      console.warn("Supabase REST 404 → falling back to mock data:", err);
-      return {
-        lots: toTypedMockLots(),
-        cameras: MOCK_CAMERAS as any,
-        events: MOCK_EVENTS as any,
-      };
+    const liveData: ParkingDataBundle = {
+      lots,
+      cameras,
+      events,
+      isCached: false,
+      cachedAt: null,
+    };
+
+    if (lots.length > 0) {
+      saveFullCache(liveData);
+      return liveData;
     }
 
-    throw err;
+    const cached = readFullCache();
+    if (cached) return cached;
+
+    return liveData;
+  } catch (err) {
+    console.warn("Live parking data failed. Trying cached data:", err);
+
+    const cached = readFullCache();
+    if (cached) return cached;
+
+    return {
+  lots: [],
+  cameras: [],
+  events: [],
+  isCached: true,
+  cachedAt: null,
+};
   }
 }
 
-// Re-export for simpler imports
 export { getAllParkingData as getTrafficData };

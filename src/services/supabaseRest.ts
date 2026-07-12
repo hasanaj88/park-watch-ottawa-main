@@ -1,12 +1,20 @@
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabaseAnonKey = import.meta.env
+  .VITE_SUPABASE_ANON_KEY as string | undefined;
 
-function mustEnv(name: string, value?: string) {
-  if (!value) throw new Error(`Missing env: ${name}. Check your .env and restart npm run dev.`);
+function mustEnv(name: string, value?: string): string {
+  if (!value) {
+    throw new Error(
+      `Missing env: ${name}. Check your .env file or Vercel Environment Variables.`
+    );
+  }
+
   return value;
 }
 
-const baseUrl = mustEnv("VITE_SUPABASE_URL", supabaseUrl).replace(/\/$/, "") + "/rest/v1";
+const baseUrl =
+  mustEnv("VITE_SUPABASE_URL", supabaseUrl).replace(/\/$/, "") + "/rest/v1";
+
 const anonKey = mustEnv("VITE_SUPABASE_ANON_KEY", supabaseAnonKey);
 
 if (import.meta.env.DEV) {
@@ -19,7 +27,10 @@ export class SupabaseRestError extends Error {
   bodyText?: string;
 
   constructor(status: number, url: string, bodyText?: string) {
-    super(`REST status ${status} ${url}${bodyText ? `\n${bodyText}` : ""}`);
+    super(
+      `REST status ${status} ${url}${bodyText ? `\n${bodyText}` : ""}`
+    );
+
     this.name = "SupabaseRestError";
     this.status = status;
     this.url = url;
@@ -27,69 +38,125 @@ export class SupabaseRestError extends Error {
   }
 }
 
-type EqFilters = Record<string, string | number | boolean | null | undefined>;
+export class SupabaseTimeoutError extends Error {
+  url: string;
+
+  constructor(url: string) {
+    super(`Supabase request timed out: ${url}`);
+    this.name = "SupabaseTimeoutError";
+    this.url = url;
+  }
+}
+
+type EqFilters = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
+
+const REQUEST_TIMEOUT_MS = 30_000;
 
 async function getJson<T>(path: string): Promise<T> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 10000);
-
   const url = baseUrl + path;
+  const controller = new AbortController();
+
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
 
   try {
-    const res = await fetch(url, {
+    const response = await fetch(url, {
+      method: "GET",
       signal: controller.signal,
       headers: {
         apikey: anonKey,
         Authorization: `Bearer ${anonKey}`,
         Accept: "application/json",
       },
+      cache: "no-store",
     });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error("[Supabase REST] ERROR", res.status, url, text);
-      throw new SupabaseRestError(res.status, url, text);
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => "");
+
+      console.error(
+        "[Supabase REST] Request failed:",
+        response.status,
+        url,
+        bodyText
+      );
+
+      throw new SupabaseRestError(response.status, url, bodyText);
     }
 
-    return (await res.json()) as T;
+    return (await response.json()) as T;
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError"
+    ) {
+      console.error(
+        `[Supabase REST] Request exceeded ${
+          REQUEST_TIMEOUT_MS / 1000
+        } seconds:`,
+        url
+      );
+
+      throw new SupabaseTimeoutError(url);
+    }
+
+    console.error("[Supabase REST] Network error:", url, error);
+    throw error;
   } finally {
-    clearTimeout(t);
+    window.clearTimeout(timeoutId);
   }
 }
 
 async function from<T>(
   tableOrView: string,
   opts?: {
-    select?: string; // default "*"
+    select?: string;
     eq?: EqFilters;
     limit?: number;
-    order?: { column: string; ascending?: boolean };
+    order?: {
+      column: string;
+      ascending?: boolean;
+    };
   }
 ): Promise<T> {
   const select = opts?.select ?? "*";
+  const query = new URLSearchParams();
 
-  const qs = new URLSearchParams();
-  qs.set("select", select);
+  query.set("select", select);
 
   if (opts?.eq) {
-    for (const [k, v] of Object.entries(opts.eq)) {
-      if (v === undefined || v === null) continue;
-      qs.set(k, `eq.${String(v)}`);
+    for (const [key, value] of Object.entries(opts.eq)) {
+      if (value === undefined || value === null) continue;
+
+      query.set(key, `eq.${String(value)}`);
     }
   }
 
   if (typeof opts?.limit === "number") {
-    qs.set("limit", String(opts.limit));
+    query.set("limit", String(opts.limit));
   }
 
   if (opts?.order?.column) {
-    const dir = opts.order.ascending === false ? "desc" : "asc";
-    qs.set("order", `${opts.order.column}.${dir}`);
+    const direction =
+      opts.order.ascending === false ? "desc" : "asc";
+
+    query.set(
+      "order",
+      `${opts.order.column}.${direction}`
+    );
   }
 
-  const path = `/${encodeURIComponent(tableOrView)}?${qs.toString()}`;
+  const path =
+    `/${encodeURIComponent(tableOrView)}?${query.toString()}`;
+
   return getJson<T>(path);
 }
 
-export const supabaseRest = { getJson, from };
-
+export const supabaseRest = {
+  getJson,
+  from,
+};
