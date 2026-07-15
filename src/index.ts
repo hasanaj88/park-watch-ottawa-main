@@ -6,54 +6,71 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
 
-    // Preflight
+    const jsonResponse = (data: unknown, status = 200) =>
+      new Response(JSON.stringify(data), {
+        status,
+        headers: {
+          "Content-Type": "application/json",
+          ...cors,
+        },
+      });
+
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: cors });
+      return new Response(null, {
+        status: 204,
+        headers: cors,
+      });
     }
 
     const url = new URL(request.url);
 
-    //  Health check
     if (url.pathname === "/") {
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { "Content-Type": "application/json", ...cors },
-      });
+      return jsonResponse({ ok: true });
     }
 
-    // AI Chat endpoint
     if (url.pathname === "/api/chat" && request.method === "POST") {
-      const body = await request.json().catch(() => ({}));
-      const prompt = String(body?.prompt ?? "").trim();
+      try {
+        const body: any = await request.json().catch(() => ({}));
+        const prompt = String(body?.prompt ?? "").trim();
 
-      if (!prompt) {
-        return new Response(JSON.stringify({ error: "prompt is required" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...cors },
-        });
-      }
-
-      const result = await env.AI.run(
-        "@cf/meta/llama-3.1-8b-instruct",
-        {
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are Ottawa Live Parking Assistant. Help users find parking in Ottawa. Be concise and practical.",
-            },
-            { role: "user", content: prompt },
-          ],
+        if (!prompt) {
+          return jsonResponse({ error: "prompt is required" }, 400);
         }
-      );
 
-      return new Response(JSON.stringify({ result }), {
-        headers: { "Content-Type": "application/json", ...cors },
-      });
+        const result = await env.AI.run(
+          "@cf/meta/llama-3.1-8b-instruct",
+          {
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are Ottawa Live Parking Assistant. Help users find parking in Ottawa. Be concise and practical.",
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+          }
+        );
+
+        return jsonResponse({ result });
+      } catch (error) {
+        console.error("Workers AI error:", error);
+
+        return jsonResponse(
+          {
+            error: "AI request failed",
+            message:
+              error instanceof Error
+                ? error.message
+                : String(error),
+          },
+          500
+        );
+      }
     }
 
-    return new Response(JSON.stringify({ error: "Not found" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json", ...cors },
-    });
+    return jsonResponse({ error: "Not found" }, 404);
   },
 };
