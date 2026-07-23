@@ -14,10 +14,13 @@ type Props = {
   onCardClick?: (lot: ParkingLot) => void;
 };
 
-const isParkingLot = (x: ParkingLot | undefined | null): x is ParkingLot => Boolean(x);
+const isParkingLot = (
+  x: ParkingLot | undefined | null
+): x is ParkingLot => Boolean(x);
 
 function hasCoords(lot: ParkingLot) {
   const c = lot.coordinates;
+
   return (
     c &&
     typeof c.lat === "number" &&
@@ -37,7 +40,6 @@ export default function ParkingCardsList({
   const [localLots, setLocalLots] = useState<ParkingLot[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [events, setEvents] = useState<TrafficEvent[]>([]);
-  const [trafficError, setTrafficError] = useState<unknown>(null);
 
   useEffect(() => {
     let alive = true;
@@ -45,38 +47,45 @@ export default function ParkingCardsList({
     async function loadAll() {
       try {
         const data = await getAllParkingData();
+
         if (!alive) return;
 
         setLocalLots(Array.isArray(data.lots) ? data.lots : []);
         setCameras(Array.isArray(data.cameras) ? data.cameras : []);
         setEvents(Array.isArray(data.events) ? data.events : []);
-        setTrafficError(null);
       } catch (e) {
         if (!alive) return;
-        setTrafficError(e);
+
+        setCameras([]);
+        setEvents([]);
+
         console.error("Failed to load parking or traffic data", e);
       }
     }
 
     loadAll();
+
     return () => {
       alive = false;
     };
   }, []);
 
   const safeLots = useMemo(() => {
-    const source = Array.isArray(lots) && lots.length > 0 ? lots : localLots;
+    const source =
+      Array.isArray(lots) && lots.length > 0 ? lots : localLots;
+
     return source.filter(isParkingLot);
   }, [lots, localLots]);
 
-  /**  availableOnly = has counts and freePct > 0 */
   const visibleLots = useMemo(() => {
     if (!availableOnly) return safeLots;
 
     return safeLots.filter((lot) => {
       const pct = getFreePct(lot);
-      if (pct === null) return false; // No counts/data → hide in "available only"
-      return pct > 0;                 // At least some free spots
+
+      if (pct === null) return false;
+
+      return pct > 0;
     });
   }, [safeLots, availableOnly]);
 
@@ -84,38 +93,61 @@ export default function ParkingCardsList({
     try {
       const lotsForSummary = safeLots
         .filter(hasCoords)
-        .map((l) => ({
-          id: String(l.id),
-          coordinates: l.coordinates!, // safe
+        .map((lot) => ({
+          id: String(lot.id),
+          coordinates: lot.coordinates!,
         }));
 
-      const cams = Array.isArray(cameras) ? cameras : [];
-      const evs = Array.isArray(events) ? events : [];
+      const safeCameras = Array.isArray(cameras) ? cameras : [];
+      const safeEvents = Array.isArray(events) ? events : [];
 
-      // radius (meters)
-      return buildAllSummaries(lotsForSummary, cams, evs, 800);
+      return buildAllSummaries(
+        lotsForSummary,
+        safeCameras,
+        safeEvents,
+        800
+      );
     } catch (e) {
       console.error("Failed to build traffic summaries", e);
+
       return {} as Record<string, any>;
     }
   }, [safeLots, cameras, events]);
 
-  if (isLoading) {
-    return <div className="p-4 text-sm text-muted-foreground">Loading parking cards…</div>;
+  if (isLoading && !safeLots.length) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Loading parking cards…
+      </div>
+    );
   }
 
-  if (error || trafficError) {
-    return <div className="p-4 text-sm text-muted-foreground">Could not load cards right now.</div>;
+  if (error && !safeLots.length) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        Could not load parking cards right now.
+      </div>
+    );
   }
 
   if (!visibleLots.length) {
-    return <div className="p-4 text-sm text-muted-foreground">No parking lots to display.</div>;
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        No parking lots to display.
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-      {visibleLots.map((lot) => {
-        const lotId = String(lot.id);
+    <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {visibleLots.map((lot, index) => {
+        const lotId = String(
+          lot.id ??
+            (lot as any).lot?.id ??
+            (lot as any).lot_id ??
+            index
+        );
+
         return (
           <ParkingCard
             key={lotId}
