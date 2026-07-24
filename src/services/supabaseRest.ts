@@ -127,8 +127,6 @@ async function getJson<T>(path: string): Promise<T> {
 
       console.error(timeoutMessage);
 
-      window.alert(timeoutMessage);
-
       throw new SupabaseTimeoutError(url);
     }
 
@@ -142,7 +140,6 @@ async function getJson<T>(path: string): Promise<T> {
       error
     );
 
-    window.alert(diagnosticMessage);
 
     throw error;
   } finally {
