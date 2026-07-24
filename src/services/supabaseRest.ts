@@ -1,6 +1,10 @@
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env
-  .VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as
+  | string
+  | undefined;
+
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
+  | string
+  | undefined;
 
 function mustEnv(name: string, value?: string): string {
   if (!value) {
@@ -13,9 +17,13 @@ function mustEnv(name: string, value?: string): string {
 }
 
 const baseUrl =
-  mustEnv("VITE_SUPABASE_URL", supabaseUrl).replace(/\/$/, "") + "/rest/v1";
+  mustEnv("VITE_SUPABASE_URL", supabaseUrl).replace(/\/$/, "") +
+  "/rest/v1";
 
-const anonKey = mustEnv("VITE_SUPABASE_ANON_KEY", supabaseAnonKey);
+const anonKey = mustEnv(
+  "VITE_SUPABASE_ANON_KEY",
+  supabaseAnonKey
+);
 
 if (import.meta.env.DEV) {
   console.log("[Supabase REST] baseUrl =", baseUrl);
@@ -26,9 +34,15 @@ export class SupabaseRestError extends Error {
   url: string;
   bodyText?: string;
 
-  constructor(status: number, url: string, bodyText?: string) {
+  constructor(
+    status: number,
+    url: string,
+    bodyText?: string
+  ) {
     super(
-      `REST status ${status} ${url}${bodyText ? `\n${bodyText}` : ""}`
+      `REST status ${status} ${url}${
+        bodyText ? `\n${bodyText}` : ""
+      }`
     );
 
     this.name = "SupabaseRestError";
@@ -43,6 +57,7 @@ export class SupabaseTimeoutError extends Error {
 
   constructor(url: string) {
     super(`Supabase request timed out: ${url}`);
+
     this.name = "SupabaseTimeoutError";
     this.url = url;
   }
@@ -76,7 +91,9 @@ async function getJson<T>(path: string): Promise<T> {
     });
 
     if (!response.ok) {
-      const bodyText = await response.text().catch(() => "");
+      const bodyText = await response
+        .text()
+        .catch(() => "");
 
       console.error(
         "[Supabase REST] Request failed:",
@@ -85,26 +102,48 @@ async function getJson<T>(path: string): Promise<T> {
         bodyText
       );
 
-      throw new SupabaseRestError(response.status, url, bodyText);
+      throw new SupabaseRestError(
+        response.status,
+        url,
+        bodyText
+      );
     }
 
     return (await response.json()) as T;
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+
     if (
       error instanceof DOMException &&
       error.name === "AbortError"
     ) {
-      console.error(
-        `[Supabase REST] Request exceeded ${
+      const timeoutMessage =
+        `Supabase request timed out after ${
           REQUEST_TIMEOUT_MS / 1000
-        } seconds:`,
-        url
-      );
+        } seconds:\n${url}`;
+
+      console.error(timeoutMessage);
+
+      window.alert(timeoutMessage);
 
       throw new SupabaseTimeoutError(url);
     }
 
-    console.error("[Supabase REST] Network error:", url, error);
+    const diagnosticMessage =
+      `Supabase request failed:\n${message}` +
+      `\n\nURL:\n${url}`;
+
+    console.error(
+      "[Supabase REST] Network error:",
+      url,
+      error
+    );
+
+    window.alert(diagnosticMessage);
+
     throw error;
   } finally {
     window.clearTimeout(timeoutId);
@@ -130,7 +169,9 @@ async function from<T>(
 
   if (opts?.eq) {
     for (const [key, value] of Object.entries(opts.eq)) {
-      if (value === undefined || value === null) continue;
+      if (value === undefined || value === null) {
+        continue;
+      }
 
       query.set(key, `eq.${String(value)}`);
     }
@@ -142,7 +183,9 @@ async function from<T>(
 
   if (opts?.order?.column) {
     const direction =
-      opts.order.ascending === false ? "desc" : "asc";
+      opts.order.ascending === false
+        ? "desc"
+        : "asc";
 
     query.set(
       "order",
@@ -151,7 +194,8 @@ async function from<T>(
   }
 
   const path =
-    `/${encodeURIComponent(tableOrView)}?${query.toString()}`;
+    `/${encodeURIComponent(tableOrView)}` +
+    `?${query.toString()}`;
 
   return getJson<T>(path);
 }
