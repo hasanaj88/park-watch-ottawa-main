@@ -59,13 +59,7 @@ export async function fetchParkingLots(): Promise<ParkingLot[]> {
    * Temporary Safari diagnostic.
    * This confirms whether the request runs and how many rows Supabase returns.
    */
-  window.alert(
-    `Parking API executed.\nRows received: ${
-      Array.isArray(data)
-        ? data.length
-        : "Invalid response"
-    }`
-  );
+ 
 
   const rows = Array.isArray(data)
     ? data
