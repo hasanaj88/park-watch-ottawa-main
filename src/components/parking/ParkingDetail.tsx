@@ -1,7 +1,15 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, Clock, DollarSign, MapPin, AlertTriangle, CheckCircle } from "lucide-react";
+import {
+  Navigation,
+  Clock,
+  DollarSign,
+  MapPin,
+  AlertTriangle,
+  CheckCircle,
+  Radio,
+} from "lucide-react";
 import { ParkingLot } from "@/types/parking";
 import {
   getLotCounts,
@@ -12,53 +20,136 @@ import {
 export type TrafficSummary = {
   nearbyCameraCount: number;
   nearbyEventCount: number;
-  disruptionScore: number; // 0..100
+  disruptionScore: number;
   maxPriority: "HIGH" | "MEDIUM" | "LOW" | "NONE";
 };
 
 interface ParkingDetailProps {
   lot: ParkingLot;
-  availabilityPercentage: number; // keep prop for compatibility
+  availabilityPercentage: number;
   onNavigate: (lot: ParkingLot) => void;
   trafficSummary?: TrafficSummary;
 }
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
+function clamp(
+  n: number,
+  min: number,
+  max: number
+) {
+  return Math.max(
+    min,
+    Math.min(max, n)
+  );
 }
 
-function safeNumber(x: unknown, fallback = 0) {
-  const n = typeof x === "number" ? x : Number(x);
-  return Number.isFinite(n) ? n : fallback;
+function safeNumber(
+  x: unknown,
+  fallback = 0
+) {
+  const n =
+    typeof x === "number"
+      ? x
+      : Number(x);
+
+  return Number.isFinite(n)
+    ? n
+    : fallback;
 }
 
-function trafficLabel(score: number) {
-  if (score >= 70) return "High";
-  if (score >= 40) return "Medium";
+function trafficLabel(
+  score: number
+) {
+  if (score >= 70) {
+    return "High";
+  }
+
+  if (score >= 40) {
+    return "Medium";
+  }
+
   return "Low";
 }
 
 export const ParkingDetail = ({
   lot,
-  availabilityPercentage, // fallback only
+  availabilityPercentage,
   onNavigate,
   trafficSummary,
 }: ParkingDetailProps) => {
-  //  Canonical counts
-  const { free, total } = getLotCounts(lot as any);
+  const lotAny = lot as any;
 
-  //  Canonical free% (preferred) using shared helper (respects hasLotCounts)
-  const freePctFromCounts = getFreePct(lot); // number | null
+  const isLive =
+    lotAny?.isLive === true;
 
-  //  Fallback to prop if canonical is missing
-  const pct =
-    freePctFromCounts !== null
-      ? freePctFromCounts
-      : Number.isFinite(availabilityPercentage)
-      ? clamp(safeNumber(availabilityPercentage, 0), 0, 100)
+  /*
+   * If the City refresh fails we keep
+   * the last successful values, but
+   * they must no longer be presented
+   * as fresh LIVE data.
+   */
+  const liveDataError =
+    typeof lotAny?.liveDataError === "string" &&
+    lotAny.liveDataError.trim().length > 0
+      ? lotAny.liveDataError
       : null;
 
-  const level = pct === null ? null : availabilityLevelByFreePct(pct);
+  const isLiveStale =
+    isLive && liveDataError !== null;
+
+  const liveAvailabilityPercentage =
+    typeof lotAny
+      ?.liveAvailabilityPercentage ===
+    "number"
+      ? clamp(
+          lotAny.liveAvailabilityPercentage,
+          0,
+          100
+        )
+      : null;
+
+  const liveOccupancyPercentage =
+    typeof lotAny
+      ?.liveOccupancyPercentage ===
+    "number"
+      ? clamp(
+          lotAny.liveOccupancyPercentage,
+          0,
+          100
+        )
+      : null;
+
+  const { free, total } =
+    getLotCounts(lotAny);
+
+  const freePctFromCounts =
+    getFreePct(lot);
+
+  const pct =
+    isLive &&
+    liveAvailabilityPercentage !==
+      null
+      ? liveAvailabilityPercentage
+      : freePctFromCounts !== null
+      ? freePctFromCounts
+      : Number.isFinite(
+          availabilityPercentage
+        )
+      ? clamp(
+          safeNumber(
+            availabilityPercentage,
+            0
+          ),
+          0,
+          100
+        )
+      : null;
+
+  const level =
+    pct === null
+      ? null
+      : availabilityLevelByFreePct(
+          pct
+        );
 
   const statusText =
     pct === null
@@ -69,10 +160,17 @@ export const ParkingDetail = ({
       ? "Moderate"
       : "Busy";
 
-  const StatusIcon = level === "busy" ? AlertTriangle : CheckCircle;
+  const StatusIcon =
+    level === "busy"
+      ? AlertTriangle
+      : CheckCircle;
 
   const badgeVariant =
-    pct === null ? "secondary" : level === "busy" ? "destructive" : "default";
+    pct === null
+      ? "secondary"
+      : level === "busy"
+      ? "destructive"
+      : "default";
 
   const badgeClass =
     pct === null
@@ -83,7 +181,6 @@ export const ParkingDetail = ({
       ? "status-moderate"
       : "status-busy";
 
-  // Gauge color by level
   const ringStroke =
     pct === null
       ? "hsl(var(--muted))"
@@ -93,49 +190,195 @@ export const ParkingDetail = ({
       ? "hsl(var(--parking-moderate))"
       : "hsl(var(--parking-busy))";
 
-  // display numbers
-  const capacity = total > 0 ? total : safeNumber((lot as any).capacity, 0);
-  const availableSpots = free === null || free === undefined ? null : free;
-  const occupiedSpots =
-    availableSpots === null || !Number.isFinite(capacity) || capacity <= 0
+  const capacity =
+    total > 0
+      ? total
+      : safeNumber(
+          lotAny.capacity,
+          0
+        );
+
+  const availableSpots =
+    free === null ||
+    free === undefined
       ? null
-      : Math.max(0, capacity - availableSpots);
+      : free;
 
-  // confidence
-  //const rawConf = safeNumber((lot as any).confidence ?? (lot as any).conf, 0);
-  //const confPct = clamp(Math.round(rawConf > 1 ? rawConf : rawConf * 100), 0, 100);
+  const occupiedSpots =
+    availableSpots === null ||
+    !Number.isFinite(capacity) ||
+    capacity <= 0
+      ? null
+      : Math.max(
+          0,
+          capacity -
+            availableSpots
+        );
 
-  const pricing = (lot as any).pricing ?? {};
-  const maxStay = pricing?.maxStay ?? "—";
-  const rate = pricing?.rate ?? "—";
-  const openUntil = pricing?.openUntil ?? "—";
+  const occupancyPct =
+    isLive &&
+    liveOccupancyPercentage !==
+      null
+      ? liveOccupancyPercentage
+      : pct !== null
+      ? 100 - pct
+      : null;
 
-  const address = (lot as any).address ?? "—";
+  const pricing =
+    lotAny.pricing ?? {};
 
-  const lastUpdatedRaw = (lot as any).lastUpdated;
+  const maxStay =
+    pricing?.maxStay ?? "—";
+
+  const rate =
+    pricing?.rate ?? "—";
+
+  const openUntil =
+    pricing?.openUntil ?? "—";
+
+  const address =
+    lotAny.address ??
+    lotAny.cityLiveAddress ??
+    "—";
+
+  /*
+   * For City LIVE lots use the time of
+   * the last successful City API fetch.
+   *
+   * Non-live lots keep using their
+   * existing lastUpdated value.
+   */
+  const lastUpdatedRaw =
+    isLive
+      ? lotAny.liveLastUpdated
+      : lotAny.lastUpdated;
+
   const lastUpdatedDate =
     lastUpdatedRaw instanceof Date
       ? lastUpdatedRaw
       : lastUpdatedRaw
-      ? new Date(lastUpdatedRaw)
+      ? new Date(
+          lastUpdatedRaw
+        )
       : null;
 
-  // ---- Traffic ----
-  const cameraCount = trafficSummary?.nearbyCameraCount ?? 0;
-  const eventCount = trafficSummary?.nearbyEventCount ?? 0;
-  const trafficScore = clamp(trafficSummary?.disruptionScore ?? 0, 0, 100);
-  const priority = trafficSummary?.maxPriority ?? "NONE";
-  const trafficLevel = trafficLabel(trafficScore);
+  const hasValidLastUpdated =
+    lastUpdatedDate !== null &&
+    !Number.isNaN(
+      lastUpdatedDate.getTime()
+    );
 
-  const handleNavigate = () => onNavigate(lot);
+  const formattedLastUpdated =
+    hasValidLastUpdated
+      ? lastUpdatedDate.toLocaleTimeString(
+          [],
+          {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+          }
+        )
+      : "—";
+
+  const cameraCount =
+    trafficSummary
+      ?.nearbyCameraCount ?? 0;
+
+  const eventCount =
+    trafficSummary
+      ?.nearbyEventCount ?? 0;
+
+  const trafficScore =
+    clamp(
+      trafficSummary
+        ?.disruptionScore ?? 0,
+      0,
+      100
+    );
+
+  const priority =
+    trafficSummary
+      ?.maxPriority ?? "NONE";
+
+  const trafficLevel =
+    trafficLabel(
+      trafficScore
+    );
+
+  const handleNavigate =
+    () => onNavigate(lot);
 
   return (
     <Card className="p-6 mb-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-4 gap-4">
         <div>
-          <h2 className="text-xl font-bold mb-1">{lot.name}</h2>
-          <p className="text-sm text-muted-foreground mb-2">ID: {lot.id}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-xl font-bold">
+              {lot.name}
+            </h2>
+
+            {isLive && (
+              <Badge
+                variant="outline"
+                className={
+                  isLiveStale
+                    ? "gap-1 border-amber-500/50 text-amber-500"
+                    : "gap-1 border-green-500/50 text-green-500"
+                }
+              >
+                {isLiveStale ? (
+                  <AlertTriangle className="h-3 w-3" />
+                ) : (
+                  <Radio className="h-3 w-3" />
+                )}
+
+                {isLiveStale
+                  ? "LAST KNOWN"
+                  : "LIVE"}
+              </Badge>
+            )}
+          </div>
+
+          {isLive && (
+            <div className="mt-1">
+              <p
+                className={
+                  isLiveStale
+                    ? "text-xs text-amber-500"
+                    : "text-xs text-green-500"
+                }
+              >
+                {isLiveStale
+                  ? "Last known data"
+                  : "Live data"}{" "}
+                ·{" "}
+                {lotAny.liveDataSource ??
+                  "City of Ottawa"}
+              </p>
+
+              <p className="text-xs text-muted-foreground mt-1">
+                {isLiveStale
+                  ? "Last successful update:"
+                  : "Last updated:"}{" "}
+                <span className="font-medium text-foreground">
+                  {formattedLastUpdated}
+                </span>
+              </p>
+
+              {isLiveStale && (
+                <p className="text-xs text-amber-500 mt-1">
+                  Live update temporarily
+                  unavailable.
+                </p>
+              )}
+            </div>
+          )}
+
+          <p className="text-sm text-muted-foreground mt-2 mb-2">
+            ID: {lot.id}
+          </p>
+
           <p className="text-sm text-muted-foreground flex items-center gap-1">
             <MapPin className="h-3 w-3" />
             {address}
@@ -143,9 +386,17 @@ export const ParkingDetail = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant={badgeVariant} className={`gap-1 ${badgeClass}`}>
+          <Badge
+            variant={
+              badgeVariant
+            }
+            className={`gap-1 ${badgeClass}`}
+          >
             <StatusIcon className="h-3 w-3" />
-            {pct === null ? "No data" : `${pct}% free`}
+
+            {pct === null
+              ? "No data"
+              : `${pct}% available`}
           </Badge>
         </div>
       </div>
@@ -153,62 +404,191 @@ export const ParkingDetail = ({
       {/* Availability Gauge */}
       <div className="flex items-center gap-6 mb-6">
         <div className="relative w-16 h-16">
-          <svg viewBox="0 0 36 36" className="w-16 h-16">
+          <svg
+            viewBox="0 0 36 36"
+            className="w-16 h-16"
+          >
             <path
               stroke="hsl(var(--muted))"
               strokeWidth="3.5"
               fill="none"
               d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"
             />
+
             <path
               stroke={ringStroke}
               strokeWidth="3.5"
               fill="none"
-              strokeDasharray={`${pct ?? 0}, 100`}
+              strokeDasharray={`${
+                pct ?? 0
+              }, 100`}
               d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"
             />
           </svg>
+
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-semibold">{pct === null ? "—" : `${pct}%`}</span>
+            <span className="text-sm font-semibold">
+              {pct === null
+                ? "—"
+                : `${pct}%`}
+            </span>
           </div>
         </div>
 
         <div>
           <div className="text-2xl font-bold mb-1">
-            {availableSpots === null || capacity <= 0 ? "—" : `${availableSpots} free / ${capacity}`}
+            {availableSpots ===
+              null ||
+            capacity <= 0
+              ? "—"
+              : `${availableSpots} free / ${capacity}`}
           </div>
+
           <p className="text-sm text-muted-foreground">
-            Status: <span className="font-medium text-foreground">{statusText}</span>
+            Status:{" "}
+            <span className="font-medium text-foreground">
+              {statusText}
+            </span>
+
             {" · "}
-            Occupied: {occupiedSpots === null ? "—" : `${occupiedSpots} spaces`}
+
+            Occupied:{" "}
+            {occupiedSpots ===
+            null
+              ? "—"
+              : `${occupiedSpots} spaces`}
           </p>
+
+          {isLive &&
+            occupancyPct !==
+              null &&
+            pct !== null && (
+              <p className="text-sm mt-2">
+                <span className="font-semibold text-foreground">
+                  {occupancyPct}%
+                  occupied
+                </span>
+
+                <span className="text-muted-foreground">
+                  {" · "}
+                  {pct}% available
+                </span>
+              </p>
+            )}
         </div>
       </div>
+
+      {/* Live source */}
+      {isLive && (
+        <div
+          className={
+            isLiveStale
+              ? "mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"
+              : "mb-6 rounded-xl border border-green-500/30 bg-green-500/5 p-4"
+          }
+        >
+          <div className="flex items-center gap-2">
+            {isLiveStale ? (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            ) : (
+              <Radio className="h-4 w-4 text-green-500" />
+            )}
+
+            <span className="text-sm font-semibold">
+              {isLiveStale
+                ? "Last Known Parking Data"
+                : "Live Parking Data"}
+            </span>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-1">
+            {isLiveStale
+              ? "Showing the most recent successful parking availability reported by "
+              : "Current parking availability reported by "}
+            {lotAny.liveDataSource ??
+              "City of Ottawa"}.
+          </p>
+
+          <p className="text-xs text-muted-foreground mt-2">
+            {isLiveStale
+              ? "Last successful update:"
+              : "Last updated:"}{" "}
+            <strong className="text-foreground">
+              {formattedLastUpdated}
+            </strong>
+          </p>
+
+          {isLiveStale && (
+            <p className="text-xs text-amber-500 mt-2">
+              Live update temporarily
+              unavailable.
+            </p>
+          )}
+
+          {typeof lotAny
+            ?.freeAccessibleSpaces ===
+            "number" && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Accessible spaces
+              free:{" "}
+              <strong className="text-foreground">
+                {
+                  lotAny.freeAccessibleSpaces
+                }
+              </strong>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Traffic Context */}
       {trafficSummary && (
         <div className="mb-6 rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium">Traffic context</span>
+            <span className="font-medium">
+              Traffic context
+            </span>
+
             <span className="text-muted-foreground">
-              {trafficLevel} · <strong className="text-foreground">{trafficScore}/100</strong>
+              {trafficLevel} ·{" "}
+              <strong className="text-foreground">
+                {trafficScore}/100
+              </strong>
             </span>
           </div>
 
           <div className="mt-3 grid grid-cols-3 gap-3">
             <div className="flex items-center justify-between rounded-lg border bg-background p-3">
-              <span className="text-sm text-muted-foreground">Cameras</span>
-              <strong className="text-sm">{cameraCount}</strong>
+              <span className="text-sm text-muted-foreground">
+                Cameras
+              </span>
+
+              <strong className="text-sm">
+                {cameraCount}
+              </strong>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border bg-background p-3">
-              <span className="text-sm text-muted-foreground">Incidents</span>
-              <strong className="text-sm">{eventCount}</strong>
+              <span className="text-sm text-muted-foreground">
+                Incidents
+              </span>
+
+              <strong className="text-sm">
+                {eventCount}
+              </strong>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border bg-background p-3">
-              <span className="text-sm text-muted-foreground">Priority</span>
-              <strong className="text-sm">{priority === "NONE" ? "—" : priority}</strong>
+              <span className="text-sm text-muted-foreground">
+                Priority
+              </span>
+
+              <strong className="text-sm">
+                {priority ===
+                "NONE"
+                  ? "—"
+                  : priority}
+              </strong>
             </div>
           </div>
         </div>
@@ -217,62 +597,122 @@ export const ParkingDetail = ({
       {/* Info Cards */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-          <span className="text-sm text-muted-foreground">Max Stay</span>
+          <span className="text-sm text-muted-foreground">
+            Max Stay
+          </span>
+
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            <strong className="text-sm">{maxStay}</strong>
+            <strong className="text-sm">
+              {maxStay}
+            </strong>
           </div>
         </div>
 
         <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-          <span className="text-sm text-muted-foreground">Rate</span>
+          <span className="text-sm text-muted-foreground">
+            Rate
+          </span>
+
           <div className="flex items-center gap-1">
             <DollarSign className="h-3 w-3" />
-            <strong className="text-sm">{rate}</strong>
+            <strong className="text-sm">
+              {rate}
+            </strong>
           </div>
         </div>
 
         <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-          <span className="text-sm text-muted-foreground">Open Until</span>
+          <span className="text-sm text-muted-foreground">
+            Open Until
+          </span>
+
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            <strong className="text-sm">{openUntil}</strong>
+            <strong className="text-sm">
+              {openUntil}
+            </strong>
           </div>
         </div>
       </div>
 
       {/* Amenities */}
-      {Array.isArray((lot as any).amenities) && (lot as any).amenities.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-medium mb-2">Amenities</h3>
-          <div className="flex flex-wrap gap-2">
-            {(lot as any).amenities.map((amenity: string, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {amenity}
-              </Badge>
-            ))}
+      {Array.isArray(
+        lotAny.amenities
+      ) &&
+        lotAny.amenities.length >
+          0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-medium mb-2">
+              Amenities
+            </h3>
+
+            <div className="flex flex-wrap gap-2">
+              {lotAny.amenities.map(
+                (
+                  amenity: string,
+                  index: number
+                ) => (
+                  <Badge
+                    key={index}
+                    variant="outline"
+                    className="text-xs"
+                  >
+                    {amenity}
+                  </Badge>
+                )
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Action Buttons */}
       <div className="flex items-center gap-3">
-        <Button onClick={handleNavigate} className="gap-2 flex-1">
+        <Button
+          onClick={
+            handleNavigate
+          }
+          className="gap-2 flex-1"
+        >
           <Navigation className="h-4 w-4" />
-          Navigate with Google Maps
+          Navigate with Google
+          Maps
         </Button>
       </div>
 
-      {/* Last Updated */}
+      {/* Source / Last Updated */}
       <div className="mt-4 pt-4 border-t">
         <p className="text-xs text-muted-foreground">
-          Last updated:{" "}
-          {lastUpdatedDate && !Number.isNaN(lastUpdatedDate.getTime())
-            ? lastUpdatedDate.toLocaleTimeString()
-            : "—"}
+          {isLive ? (
+            <>
+              Source:{" "}
+              <strong>
+                {lotAny.liveDataSource ??
+                  "City of Ottawa"}
+              </strong>
+
+              {" · "}
+
+              {isLiveStale
+                ? "Last known availability"
+                : "Live availability"}
+
+              {" · "}
+
+              {isLiveStale
+                ? "Last successful update"
+                : "Updated"}
+              :{" "}
+              {formattedLastUpdated}
+            </>
+          ) : (
+            <>
+              Last updated:{" "}
+              {formattedLastUpdated}
+            </>
+          )}
         </p>
       </div>
     </Card>
   );
 };
-
