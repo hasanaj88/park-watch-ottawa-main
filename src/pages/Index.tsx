@@ -8,7 +8,11 @@ import React, { useMemo, useState } from "react";
 import { useParkingLots } from "@/hooks/useParkingLots";
 import { useEnhancedLots } from "@/hooks/useEnhancedLots";
 import { openGoogleMapsNavigation } from "@/utils/navigation";
-import { ParkingHeader } from "@/components/parking/ParkingHeader";
+import {
+  ParkingHeader,
+  type NearbyParkingItem,
+  type NearbyParkingResult,
+} from "@/components/parking/ParkingHeader";
 import { ParkingControls } from "@/components/parking/ParkingControls";
 import { ParkingLotDetailMap } from "@/components/parking/ParkingLotDetailMap";
 import { ParkingDetail } from "@/components/parking/ParkingDetail";
@@ -129,6 +133,49 @@ const distanceInMeters = (
   return earthRadius * c;
 };
 
+const getSegmentMidpoint = (
+  coordinates: [number, number][]
+): {
+  lat: number;
+  lng: number;
+} | null => {
+  if (!coordinates.length) {
+    return null;
+  }
+
+  const first = coordinates[0];
+  const last =
+    coordinates[
+      coordinates.length - 1
+    ];
+
+  if (!first || !last) {
+    return null;
+  }
+
+  const lng =
+    (Number(first[0]) +
+      Number(last[0])) /
+    2;
+
+  const lat =
+    (Number(first[1]) +
+      Number(last[1])) /
+    2;
+
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    return null;
+  }
+
+  return {
+    lat,
+    lng,
+  };
+};
+
 const Index = () => {
   const {
     lots,
@@ -224,7 +271,10 @@ const Index = () => {
         return baseDisplayLots;
       }
 
-      return (
+      const matchedCityIds =
+        new Set<number>();
+
+      const mergedBaseLots = (
         baseDisplayLots as any[]
       ).map((lot: any) => {
         const lotAddress =
@@ -329,6 +379,10 @@ const Index = () => {
           };
         }
 
+        matchedCityIds.add(
+          liveMatch.id
+        );
+
         const liveCapacity =
           liveMatch.capacity;
 
@@ -397,6 +451,8 @@ const Index = () => {
             liveMatch.lotId,
 
           // Mark data source
+          isCityOfficial: true,
+
           isLive:
             hasLiveOccupancy,
 
@@ -456,13 +512,312 @@ const Index = () => {
 
           cityLongitude:
             liveMatch.longitude,
+
+          coordinates: {
+            lat:
+              liveMatch.latitude,
+            lng:
+              liveMatch.longitude,
+          },
         };
       });
+
+      /*
+       * Sprint 3:
+       * Add official City lots that are not already
+       * represented by an existing project lot.
+       */
+      const unmatchedCityLots =
+        liveParkingLots
+          .filter(
+            (liveLot) =>
+              !matchedCityIds.has(
+                liveLot.id
+              )
+          )
+          .map((liveLot) => {
+            const liveCapacity =
+              liveLot.capacity;
+
+            const liveFree =
+              liveLot.freeSpaces;
+
+            const hasLiveOccupancy =
+              liveCapacity !== null &&
+              liveCapacity > 0 &&
+              liveFree !== null;
+
+            const safeFree =
+              hasLiveOccupancy
+                ? Math.min(
+                    liveCapacity,
+                    Math.max(
+                      0,
+                      liveFree
+                    )
+                  )
+                : null;
+
+            const occupied =
+              hasLiveOccupancy &&
+              safeFree !== null
+                ? Math.max(
+                    0,
+                    liveCapacity -
+                      safeFree
+                  )
+                : null;
+
+            const availabilityPercentage =
+              hasLiveOccupancy &&
+              safeFree !== null
+                ? Math.round(
+                    (safeFree /
+                      liveCapacity) *
+                      100
+                  )
+                : null;
+
+            const occupancyPercentage =
+              hasLiveOccupancy &&
+              occupied !== null
+                ? Math.round(
+                    (occupied /
+                      liveCapacity) *
+                      100
+                  )
+                : null;
+
+            const cityAddress =
+              liveLot.address?.trim() ||
+              `City Parking Lot ${liveLot.lotId}`;
+
+            return {
+              id:
+                `city-${liveLot.id}`,
+
+              name:
+                cityAddress,
+
+              address:
+                liveLot.address ??
+                cityAddress,
+
+              cityParkingId:
+                liveLot.id,
+
+              cityLotId:
+                liveLot.lotId,
+
+              isCityOfficial:
+                true,
+
+              isLive:
+                hasLiveOccupancy,
+
+              liveDataSource:
+                "City of Ottawa",
+
+              liveLastUpdated:
+                liveParkingLastUpdated,
+
+              liveDataError:
+                liveParkingError,
+
+              capacity:
+                liveCapacity ?? 0,
+
+              total:
+                liveCapacity ?? 0,
+
+              map_capacity:
+                liveCapacity ?? 0,
+
+              free:
+                safeFree,
+
+              available:
+                safeFree,
+
+              freeSpaces:
+                safeFree,
+
+              occupied,
+
+              liveAvailabilityPercentage:
+                availabilityPercentage,
+
+              liveOccupancyPercentage:
+                occupancyPercentage,
+
+              freeAccessibleSpaces:
+                liveLot.freeAccessibleSpaces,
+
+              cityLiveAddress:
+                liveLot.address,
+
+              cityLatitude:
+                liveLot.latitude,
+
+              cityLongitude:
+                liveLot.longitude,
+
+              type:
+                liveLot.type,
+
+              coordinates: {
+                lat:
+                  liveLot.latitude,
+                lng:
+                  liveLot.longitude,
+              },
+            } as any;
+          });
+
+      return [
+        ...mergedBaseLots,
+        ...unmatchedCityLots,
+      ];
     }, [
       baseDisplayLots,
       liveParkingLots,
       liveParkingLastUpdated,
       liveParkingError,
+    ]);
+
+  /*
+   * Sprint 3 — Unified Parking Near You
+   *
+   * The existing Near You button now searches:
+   * - project parking lots
+   * - official City lots
+   * - 15-minute free segments
+   * - paid street parking segments
+   */
+  const nearbyParkingItems:
+    NearbyParkingItem[] =
+    useMemo(() => {
+      const lotItems:
+        NearbyParkingItem[] =
+        (displayLots as any[])
+          .map((lot: any) => {
+            const lat =
+              getLatitude(lot);
+
+            const lng =
+              getLongitude(lot);
+
+            if (
+              lat === null ||
+              lng === null
+            ) {
+              return null;
+            }
+
+            return {
+              id: `lot-${String(
+                lot.id
+              )}`,
+              lotId: String(
+                lot.id
+              ),
+              name:
+                lot?.name ??
+                lot?.address ??
+                "Parking Lot",
+              kind: "lot" as const,
+              coordinates: {
+                lat,
+                lng,
+              },
+            };
+          })
+          .filter(
+            (
+              item
+            ): item is NearbyParkingItem =>
+              item !== null
+          );
+
+      const fifteenItems:
+        NearbyParkingItem[] =
+        fifteenMinSegments
+          .map((segment) => {
+            const midpoint =
+              getSegmentMidpoint(
+                segment.coordinates
+              );
+
+            if (!midpoint) {
+              return null;
+            }
+
+            return {
+              id: `15min-${String(
+                segment.id
+              )}`,
+              name:
+                "15 Minute Free Parking",
+              kind: "15min" as const,
+              coordinates:
+                midpoint,
+            };
+          })
+          .filter(
+            (
+              item
+            ): item is NearbyParkingItem =>
+              item !== null
+          );
+
+      const paidItems:
+        NearbyParkingItem[] =
+        paidStreetSegments
+          .map((segment) => {
+            const midpoint =
+              getSegmentMidpoint(
+                segment.coordinates
+              );
+
+            if (!midpoint) {
+              return null;
+            }
+
+            const road =
+              typeof segment.road ===
+                "string" &&
+              segment.road.trim()
+                ? segment.road.trim()
+                : null;
+
+            return {
+              id: `paid-${String(
+                segment.id
+              )}`,
+              name: road
+                ? `Paid Parking · ${road}`
+                : "Paid Street Parking",
+              kind: "paid" as const,
+              coordinates:
+                midpoint,
+            };
+          })
+          .filter(
+            (
+              item
+            ): item is NearbyParkingItem =>
+              item !== null
+          );
+
+      return [
+        ...lotItems,
+        ...fifteenItems,
+        ...paidItems,
+      ];
+    }, [
+      displayLots,
+      fifteenMinSegments,
+      paidStreetSegments,
     ]);
 
   const selectedLotEnhanced =
@@ -485,6 +840,20 @@ const Index = () => {
 
   const [activeTab, setActiveTab] =
     useState("overview");
+
+  const [
+    nearbyFocus,
+    setNearbyFocus,
+  ] = useState<{
+    lat: number;
+    lng: number;
+    kind:
+      | "lot"
+      | "15min"
+      | "paid";
+    targetId: string;
+    requestId: number;
+  } | null>(null);
 
   const { toast } = useToast();
 
@@ -639,28 +1008,44 @@ const Index = () => {
           isLoading={
             isLoading
           }
+          nearbyItems={
+            nearbyParkingItems
+          }
           onFindNearby={(
-            nearbyLots
+            nearbyResults:
+              NearbyParkingResult[]
           ) => {
             const first =
-              nearbyLots?.[0];
+              nearbyResults?.[0];
 
-            const firstId =
-              first?.id;
-
-            if (firstId) {
-              selectLot(
-                String(firstId)
-              );
-
-              setActiveTab(
-                "overview"
-              );
+            if (!first) {
+              return;
             }
+
+            /*
+             * Keep the main map visible for every
+             * nearby result type, then fly to the
+             * selected item and open its popup.
+             */
+            clearSelectedLot();
+
+            setNearbyFocus({
+              lat:
+                first.coordinates.lat,
+              lng:
+                first.coordinates.lng,
+              kind:
+                first.kind,
+              targetId:
+                first.id,
+              requestId:
+                Date.now(),
+            });
+
+            setActiveTab(
+              "overview"
+            );
           }}
-          allLots={
-            allLots
-          }
         />
 
         <main className="container mx-auto px-4 py-6 pb-24">
@@ -736,6 +1121,9 @@ const Index = () => {
                       }
                       paidStreetSegments={
                         paidStreetSegments
+                      }
+                      focusLocation={
+                        nearbyFocus
                       }
                       selectedLotId={String(
                         selectedLotId ??

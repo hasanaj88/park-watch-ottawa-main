@@ -1,6 +1,6 @@
 ﻿// src/components/maps/LeafletParkingMap.tsx
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
 import {
@@ -22,6 +22,13 @@ type Props = {
   lots: ParkingLot[];
   fifteenMinSegments: Ottawa15MinParkingSegment[];
   paidStreetSegments: OttawaPaidStreetParkingSegment[];
+  focusLocation?: {
+    lat: number;
+    lng: number;
+    kind: "lot" | "15min" | "paid";
+    targetId: string;
+    requestId: number;
+  } | null;
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
 };
@@ -92,10 +99,68 @@ function FitPaidStreetBounds({
   return null;
 }
 
+function FocusNearbyLocation({
+  target,
+}: {
+  target?: {
+    lat: number;
+    lng: number;
+    kind: "lot" | "15min" | "paid";
+    targetId: string;
+    requestId: number;
+  } | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!target) {
+      return;
+    }
+
+    if (
+      !Number.isFinite(target.lat) ||
+      !Number.isFinite(target.lng)
+    ) {
+      return;
+    }
+
+    /*
+     * Let layer-fit effects finish first,
+     * then focus the actual nearest result.
+     */
+    const timer =
+      window.setTimeout(() => {
+        map.flyTo(
+          [
+            target.lat,
+            target.lng,
+          ],
+          17,
+          {
+            animate: true,
+            duration: 0.8,
+          }
+        );
+      }, 60);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    map,
+    target?.lat,
+    target?.lng,
+    target?.requestId,
+  ]);
+
+  return null;
+}
+
 export default function LeafletParkingMap({
   lots,
   fifteenMinSegments,
   paidStreetSegments,
+  focusLocation,
   selectedLotId,
   onLotSelect,
 }: Props) {
@@ -103,6 +168,18 @@ export default function LeafletParkingMap({
     45.4215,
     -75.6972,
   ];
+
+  const lotLayerRefs = useRef<
+    Record<string, L.Marker | null>
+  >({});
+
+  const fifteenLayerRefs = useRef<
+    Record<string, L.Polyline | null>
+  >({});
+
+  const paidLayerRefs = useRef<
+    Record<string, L.Polyline | null>
+  >({});
 
   const [showFifteenMin, setShowFifteenMin] =
     useState(true);
@@ -123,6 +200,76 @@ export default function LeafletParkingMap({
         ? window.innerWidth > 640
         : true
     );
+
+  useEffect(() => {
+    if (
+      focusLocation?.kind ===
+      "15min"
+    ) {
+      setShowFifteenMin(true);
+    }
+
+    if (
+      focusLocation?.kind ===
+      "paid"
+    ) {
+      setShowPaidStreet(true);
+    }
+  }, [
+    focusLocation?.kind,
+    focusLocation?.requestId,
+  ]);
+
+  useEffect(() => {
+    if (!focusLocation) {
+      return;
+    }
+
+    const timer =
+      window.setTimeout(() => {
+        const targetId =
+          focusLocation.targetId;
+
+        let layer:
+          | L.Marker
+          | L.Polyline
+          | null
+          | undefined;
+
+        if (
+          focusLocation.kind ===
+          "lot"
+        ) {
+          layer =
+            lotLayerRefs.current[
+              targetId
+            ];
+        } else if (
+          focusLocation.kind ===
+          "15min"
+        ) {
+          layer =
+            fifteenLayerRefs.current[
+              targetId
+            ];
+        } else {
+          layer =
+            paidLayerRefs.current[
+              targetId
+            ];
+        }
+
+        layer?.openPopup();
+      }, 900);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    focusLocation?.targetId,
+    focusLocation?.kind,
+    focusLocation?.requestId,
+  ]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -192,6 +339,37 @@ export default function LeafletParkingMap({
               border-radius: 8px;
               background: #16a34a;
               border: 2px solid #bbf7d0;
+              color: #ffffff;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 17px;
+              font-weight: 800;
+              box-shadow: 0 3px 9px rgba(0,0,0,0.4);
+            "
+          >
+            P
+          </div>
+        `,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -17],
+      }),
+    []
+  );
+
+  const officialCityParkingIcon = useMemo(
+    () =>
+      L.divIcon({
+        className: "",
+        html: `
+          <div
+            style="
+              width: 30px;
+              height: 30px;
+              border-radius: 8px;
+              background: #0284c7;
+              border: 2px solid #bae6fd;
               color: #ffffff;
               display: flex;
               align-items: center;
@@ -539,6 +717,40 @@ export default function LeafletParkingMap({
                     : 20,
                   borderRadius: 6,
                   background:
+                    "#0284c7",
+                  border:
+                    "1px solid #bae6fd",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent:
+                    "center",
+                  fontWeight: 800,
+                  fontSize: 10,
+                }}
+              >
+                P
+              </div>
+              <span>Official City</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                marginBottom: 5,
+              }}
+            >
+              <div
+                style={{
+                  width: isMobile
+                    ? 18
+                    : 20,
+                  height: isMobile
+                    ? 18
+                    : 20,
+                  borderRadius: 6,
+                  background:
                     "#0f172a",
                   border:
                     "1px solid #60a5fa",
@@ -686,6 +898,10 @@ export default function LeafletParkingMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <FocusNearbyLocation
+          target={focusLocation}
+        />
+
         <FitFifteenMinBounds
           segments={fifteenMinSegments}
           enabled={showFifteenMin}
@@ -726,6 +942,14 @@ export default function LeafletParkingMap({
 
           const isLive =
             lotAny.isLive === true;
+
+          const isCityOfficial =
+            lotAny.isCityOfficial === true ||
+            lotAny.cityParkingId != null ||
+            lotAny.cityLotId != null;
+
+          const isOfficialCityNonLive =
+            isCityOfficial && !isLive;
 
           const liveDataError =
             typeof lotAny.liveDataError === "string" &&
@@ -807,6 +1031,8 @@ export default function LeafletParkingMap({
             ? selectedParkingIcon
             : isLive
             ? liveParkingIcon
+            : isOfficialCityNonLive
+            ? officialCityParkingIcon
             : normalParkingIcon;
 
           return (
@@ -814,6 +1040,11 @@ export default function LeafletParkingMap({
               key={String(lot.id)}
               position={position}
               icon={icon}
+              ref={(layer) => {
+                lotLayerRefs.current[
+                  `lot-${String(lot.id)}`
+                ] = layer;
+              }}
             >
               <Popup>
                 <div
@@ -823,7 +1054,8 @@ export default function LeafletParkingMap({
                       : undefined,
                     minWidth: isMobile
                       ? 0
-                      : isLive
+                      : isLive ||
+                        isOfficialCityNonLive
                       ? 225
                       : 160,
                     maxWidth: isMobile
@@ -926,6 +1158,68 @@ export default function LeafletParkingMap({
                     </>
                   )}
 
+                  {isOfficialCityNonLive && (
+                    <>
+                      <div
+                        style={{
+                          marginTop: 6,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: "#0284c7",
+                        }}
+                      >
+                        ● OFFICIAL CITY PARKING
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: "8px 10px",
+                          borderRadius: 8,
+                          background:
+                            "rgba(2,132,199,0.08)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 800,
+                          }}
+                        >
+                          Availability currently
+                          unavailable
+                        </div>
+
+                        {Number.isFinite(
+                          capacity
+                        ) &&
+                          capacity > 0 && (
+                            <div
+                              style={{
+                                marginTop: 3,
+                                fontSize: 12,
+                                color:
+                                  "#64748b",
+                              }}
+                            >
+                              Capacity:{" "}
+                              {capacity} spaces
+                            </div>
+                          )}
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 7,
+                          fontSize: 11,
+                          color: "#64748b",
+                        }}
+                      >
+                        City of Ottawa
+                      </div>
+                    </>
+                  )}
+
                   <div
                     style={{
                       display: "flex",
@@ -948,6 +1242,8 @@ export default function LeafletParkingMap({
                         cursor: "pointer",
                         background: isLive
                           ? "#16a34a"
+                          : isOfficialCityNonLive
+                          ? "#0284c7"
                           : "#0f172a",
                         color: "#ffffff",
                         fontWeight: 700,
@@ -1007,6 +1303,13 @@ export default function LeafletParkingMap({
               return (
                 <Polyline
                   key={`15min-${segment.id}`}
+                  ref={(layer) => {
+                    fifteenLayerRefs.current[
+                      `15min-${String(
+                        segment.id
+                      )}`
+                    ] = layer;
+                  }}
                   positions={positions}
                   pathOptions={{
                     color: "#16a34a",
@@ -1170,6 +1473,13 @@ export default function LeafletParkingMap({
               return (
                 <Polyline
                   key={`paid-${segment.id}`}
+                  ref={(layer) => {
+                    paidLayerRefs.current[
+                      `paid-${String(
+                        segment.id
+                      )}`
+                    ] = layer;
+                  }}
                   positions={positions}
                   pathOptions={{
                     color: "#2563eb",
