@@ -110,6 +110,45 @@ export default function LeafletParkingMap({
   const [showPaidStreet, setShowPaidStreet] =
     useState(false);
 
+  const [isMobile, setIsMobile] =
+    useState(() =>
+      typeof window !== "undefined"
+        ? window.innerWidth <= 640
+        : false
+    );
+
+  const [showLegend, setShowLegend] =
+    useState(() =>
+      typeof window !== "undefined"
+        ? window.innerWidth > 640
+        : true
+    );
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile =
+        window.innerWidth <= 640;
+
+      setIsMobile(mobile);
+
+      if (!mobile) {
+        setShowLegend(true);
+      }
+    };
+
+    window.addEventListener(
+      "resize",
+      handleResize
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        handleResize
+      );
+    };
+  }, []);
+
   const normalParkingIcon = useMemo(
     () =>
       L.divIcon({
@@ -350,120 +389,216 @@ export default function LeafletParkingMap({
       <div
         style={{
           position: "absolute",
-          left: 12,
-          bottom: 28,
+          left: isMobile ? 10 : 12,
+          bottom: isMobile ? 34 : 28,
           zIndex: 1000,
-          minWidth: 150,
-          padding: "10px 12px",
-          borderRadius: 10,
-          background: "rgba(15,23,42,0.92)",
-          color: "#ffffff",
-          boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-          backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255,255,255,0.14)",
-          fontSize: 11,
         }}
       >
-        <div
-          style={{
-            fontWeight: 800,
-            fontSize: 12,
-            marginBottom: 8,
-          }}
-        >
-          Parking Map
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 6,
-          }}
-        >
-          <div
+        {isMobile && !showLegend ? (
+          <button
+            type="button"
+            onClick={() =>
+              setShowLegend(true)
+            }
+            aria-label="Show map legend"
             style={{
-              width: 20,
-              height: 20,
-              borderRadius: 6,
-              background: "#16a34a",
-              border: "1px solid #bbf7d0",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
+              border:
+                "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 9,
+              padding: "7px 10px",
+              background:
+                "rgba(15,23,42,0.92)",
+              color: "#ffffff",
+              boxShadow:
+                "0 4px 14px rgba(0,0,0,0.25)",
+              backdropFilter: "blur(8px)",
               fontSize: 11,
+              fontWeight: 800,
+              cursor: "pointer",
             }}
           >
-            P
-          </div>
-          <span>Live parking</span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 6,
-          }}
-        >
+            Map Key
+          </button>
+        ) : (
           <div
             style={{
-              width: 20,
-              height: 20,
-              borderRadius: 6,
-              background: "#0f172a",
-              border: "1px solid #60a5fa",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
-              fontSize: 11,
+              minWidth: isMobile
+                ? 132
+                : 150,
+              padding: isMobile
+                ? "8px 10px"
+                : "10px 12px",
+              borderRadius: 10,
+              background:
+                "rgba(15,23,42,0.92)",
+              color: "#ffffff",
+              boxShadow:
+                "0 4px 14px rgba(0,0,0,0.25)",
+              backdropFilter: "blur(8px)",
+              border:
+                "1px solid rgba(255,255,255,0.14)",
+              fontSize: isMobile
+                ? 10
+                : 11,
             }}
           >
-            P
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent:
+                  "space-between",
+                gap: 10,
+                marginBottom: 7,
+              }}
+            >
+              <div
+                style={{
+                  fontWeight: 800,
+                  fontSize: isMobile
+                    ? 11
+                    : 12,
+                }}
+              >
+                Parking Map
+              </div>
+
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowLegend(false)
+                  }
+                  aria-label="Hide map legend"
+                  style={{
+                    border: "none",
+                    background:
+                      "transparent",
+                    color: "#ffffff",
+                    padding: 0,
+                    fontSize: 15,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    opacity: 0.8,
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                marginBottom: 5,
+              }}
+            >
+              <div
+                style={{
+                  width: isMobile
+                    ? 18
+                    : 20,
+                  height: isMobile
+                    ? 18
+                    : 20,
+                  borderRadius: 6,
+                  background:
+                    "#16a34a",
+                  border:
+                    "1px solid #bbf7d0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent:
+                    "center",
+                  fontWeight: 800,
+                  fontSize: 10,
+                }}
+              >
+                P
+              </div>
+              <span>Live parking</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                marginBottom: 5,
+              }}
+            >
+              <div
+                style={{
+                  width: isMobile
+                    ? 18
+                    : 20,
+                  height: isMobile
+                    ? 18
+                    : 20,
+                  borderRadius: 6,
+                  background:
+                    "#0f172a",
+                  border:
+                    "1px solid #60a5fa",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent:
+                    "center",
+                  fontWeight: 800,
+                  fontSize: 10,
+                }}
+              >
+                P
+              </div>
+              <span>Parking lot</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                marginBottom: 5,
+              }}
+            >
+              <div
+                style={{
+                  width: isMobile
+                    ? 19
+                    : 22,
+                  height: 5,
+                  borderRadius: 999,
+                  background:
+                    "#16a34a",
+                }}
+              />
+              <span>15 Min Free</span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+              }}
+            >
+              <div
+                style={{
+                  width: isMobile
+                    ? 19
+                    : 22,
+                  height: 5,
+                  borderRadius: 999,
+                  background:
+                    "#2563eb",
+                }}
+              />
+              <span>Paid Street</span>
+            </div>
           </div>
-          <span>Parking lot</span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 5,
-              borderRadius: 999,
-              background: "#16a34a",
-            }}
-          />
-          <span>15 Min Free</span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 5,
-              borderRadius: 999,
-              background: "#2563eb",
-            }}
-          />
-          <span>Paid Street</span>
-        </div>
+        )}
       </div>
 
       {/* 15 Minute Free Toggle */}
@@ -476,14 +611,16 @@ export default function LeafletParkingMap({
         }
         style={{
           position: "absolute",
-          top: 12,
-          right: 12,
+          top: isMobile ? 10 : 12,
+          right: isMobile ? 10 : 12,
           zIndex: 1000,
           border:
             "1px solid rgba(255,255,255,0.18)",
-          borderRadius: 10,
-          padding: "9px 13px",
-          fontSize: 13,
+          borderRadius: isMobile ? 9 : 10,
+          padding: isMobile
+            ? "7px 10px"
+            : "9px 13px",
+          fontSize: isMobile ? 11 : 13,
           fontWeight: 700,
           cursor: "pointer",
           background: showFifteenMin
@@ -510,14 +647,16 @@ export default function LeafletParkingMap({
         }
         style={{
           position: "absolute",
-          top: 58,
-          right: 12,
+          top: isMobile ? 48 : 58,
+          right: isMobile ? 10 : 12,
           zIndex: 1000,
           border:
             "1px solid rgba(255,255,255,0.18)",
-          borderRadius: 10,
-          padding: "9px 13px",
-          fontSize: 13,
+          borderRadius: isMobile ? 9 : 10,
+          padding: isMobile
+            ? "7px 10px"
+            : "9px 13px",
+          fontSize: isMobile ? 11 : 13,
           fontWeight: 700,
           cursor: "pointer",
           background: showPaidStreet
@@ -679,7 +818,17 @@ export default function LeafletParkingMap({
               <Popup>
                 <div
                   style={{
-                    minWidth: isLive ? 225 : 160,
+                    width: isMobile
+                      ? "min(230px, calc(100vw - 96px))"
+                      : undefined,
+                    minWidth: isMobile
+                      ? 0
+                      : isLive
+                      ? 225
+                      : 160,
+                    maxWidth: isMobile
+                      ? "calc(100vw - 96px)"
+                      : 280,
                     lineHeight: 1.45,
                   }}
                 >
@@ -868,7 +1017,15 @@ export default function LeafletParkingMap({
                   <Popup>
                     <div
                       style={{
-                        minWidth: 200,
+                        width: isMobile
+                          ? "min(230px, calc(100vw - 96px))"
+                          : undefined,
+                        minWidth: isMobile
+                          ? 0
+                          : 200,
+                        maxWidth: isMobile
+                          ? "calc(100vw - 96px)"
+                          : 280,
                         lineHeight: 1.45,
                       }}
                     >
@@ -1023,7 +1180,15 @@ export default function LeafletParkingMap({
                   <Popup>
                     <div
                       style={{
-                        minWidth: 220,
+                        width: isMobile
+                          ? "min(230px, calc(100vw - 96px))"
+                          : undefined,
+                        minWidth: isMobile
+                          ? 0
+                          : 220,
+                        maxWidth: isMobile
+                          ? "calc(100vw - 96px)"
+                          : 300,
                         lineHeight: 1.5,
                       }}
                     >
