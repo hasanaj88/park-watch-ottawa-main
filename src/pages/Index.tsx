@@ -726,6 +726,38 @@ const Index = () => {
                 lot?.address ??
                 "Parking Lot",
               kind: "lot" as const,
+              groupKey:
+                `lot-${String(
+                  lot.id
+                )}`,
+              isLive:
+                lot?.isLive === true,
+              isCityOfficial:
+                lot?.isCityOfficial ===
+                  true,
+              freeSpaces:
+                typeof lot?.free ===
+                  "number"
+                  ? lot.free
+                  : typeof lot
+                        ?.freeSpaces ===
+                      "number"
+                  ? lot.freeSpaces
+                  : null,
+              capacity:
+                Number.isFinite(
+                  Number(
+                    lot?.capacity ??
+                      lot?.total ??
+                      lot?.map_capacity
+                  )
+                )
+                  ? Number(
+                      lot?.capacity ??
+                        lot?.total ??
+                        lot?.map_capacity
+                    )
+                  : null,
               coordinates: {
                 lat,
                 lng,
@@ -759,6 +791,12 @@ const Index = () => {
               name:
                 "15 Minute Free Parking",
               kind: "15min" as const,
+              groupKey:
+                `15min-${midpoint.lat.toFixed(
+                  3
+                )}-${midpoint.lng.toFixed(
+                  3
+                )}`,
               coordinates:
                 midpoint,
             };
@@ -790,6 +828,28 @@ const Index = () => {
                 ? segment.road.trim()
                 : null;
 
+            const hourlyRate =
+              segment.hourlyRate;
+
+            const rateNumber =
+              hourlyRate !== null &&
+              hourlyRate !== undefined &&
+              hourlyRate !== ""
+                ? Number(hourlyRate)
+                : null;
+
+            const rateLabel =
+              rateNumber !== null &&
+              Number.isFinite(rateNumber)
+                ? `$${rateNumber.toFixed(
+                    Number.isInteger(
+                      rateNumber
+                    )
+                      ? 0
+                      : 2
+                  )}/hr`
+                : null;
+
             return {
               id: `paid-${String(
                 segment.id
@@ -798,6 +858,18 @@ const Index = () => {
                 ? `Paid Parking · ${road}`
                 : "Paid Street Parking",
               kind: "paid" as const,
+              groupKey: road
+                ? `paid-${road
+                    .toLowerCase()
+                    .replace(
+                      /\s+/g,
+                      " "
+                    )
+                    .trim()}`
+                : `paid-${String(
+                    segment.id
+                  )}`,
+              rateLabel,
               coordinates:
                 midpoint,
             };

@@ -29,6 +29,11 @@ type Props = {
     targetId: string;
     requestId: number;
   } | null;
+  userLocation?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+  } | null;
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
 };
@@ -161,6 +166,7 @@ export default function LeafletParkingMap({
   fifteenMinSegments,
   paidStreetSegments,
   focusLocation,
+  userLocation,
   selectedLotId,
   onLotSelect,
 }: Props) {
@@ -901,6 +907,55 @@ export default function LeafletParkingMap({
         <FocusNearbyLocation
           target={focusLocation}
         />
+
+        {userLocation &&
+          Number.isFinite(
+            userLocation.lat
+          ) &&
+          Number.isFinite(
+            userLocation.lng
+          ) && (
+            <CircleMarker
+              center={[
+                userLocation.lat,
+                userLocation.lng,
+              ]}
+              radius={8}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 3,
+                fillColor: "#2563eb",
+                fillOpacity: 1,
+              }}
+            >
+              <Popup>
+                <div
+                  style={{
+                    minWidth: 130,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                    }}
+                  >
+                    Your Location
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12,
+                      color: "#64748b",
+                    }}
+                  >
+                    Used for Parking Near You
+                  </div>
+                </div>
+              </Popup>
+            </CircleMarker>
+          )}
 
         <FitFifteenMinBounds
           segments={fifteenMinSegments}

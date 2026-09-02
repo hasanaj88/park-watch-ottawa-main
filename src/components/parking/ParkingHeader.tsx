@@ -19,6 +19,12 @@ export type NearbyParkingItem = {
     lng: number;
   };
   lotId?: string;
+  groupKey?: string;
+  rateLabel?: string | null;
+  isLive?: boolean;
+  isCityOfficial?: boolean;
+  freeSpaces?: number | null;
+  capacity?: number | null;
 };
 
 export type NearbyParkingResult =
@@ -143,15 +149,93 @@ export const ParkingHeader = ({
                   item.coordinates.lat,
                   item.coordinates.lng
                 ),
-            }))
-            .sort(
-              (a, b) =>
-                a.distanceKm -
-                b.distanceKm
+            }));
+
+        /*
+         * Smart Nearby Ranking
+         *
+         * 1. Collapse repeated nearby street
+         *    segments into one useful choice.
+         * 2. Keep the closest member of each group.
+         * 3. Distance stays the main factor, with
+         *    a small preference for LIVE and free
+         *    15-minute parking when similarly close.
+         */
+        const closestByGroup =
+          new Map<
+            string,
+            NearbyParkingResult
+          >();
+
+        for (
+          const item of itemsWithDistance
+        ) {
+          const key =
+            item.groupKey ??
+            item.id;
+
+          const current =
+            closestByGroup.get(key);
+
+          if (
+            !current ||
+            item.distanceKm <
+              current.distanceKm
+          ) {
+            closestByGroup.set(
+              key,
+              item
             );
+          }
+        }
+
+        const smartScore = (
+          item: NearbyParkingResult
+        ) => {
+          let bonusKm = 0;
+
+          if (item.isLive) {
+            bonusKm += 0.08;
+          }
+
+          if (
+            item.kind === "15min"
+          ) {
+            bonusKm += 0.04;
+          }
+
+          return (
+            item.distanceKm -
+            bonusKm
+          );
+        };
 
         const nearby =
-          itemsWithDistance.slice(0, 5);
+          Array.from(
+            closestByGroup.values()
+          )
+            .sort((a, b) => {
+              const scoreDiff =
+                smartScore(a) -
+                smartScore(b);
+
+              if (
+                Math.abs(scoreDiff) >
+                0.001
+              ) {
+                return scoreDiff;
+              }
+
+              return (
+                a.distanceKm -
+                b.distanceKm
+              );
+            })
+            .filter(
+              (item) =>
+                item.distanceKm <= 2
+            )
+            .slice(0, 5);
 
         setIsGettingLocation(false);
 
@@ -352,7 +436,7 @@ export const ParkingHeader = ({
                     Parking Near You
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Choose one of the 5 closest options
+                    Best nearby options within 2 km
                   </div>
                 </div>
 
@@ -415,16 +499,46 @@ export const ParkingHeader = ({
                             {result.name}
                           </div>
 
-                          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                             <span>
                               {getTypeLabel(
                                 result.kind
                               )}
                             </span>
 
-                            <span>
-                              ·
-                            </span>
+                            {result.isLive && (
+                              <>
+                                <span>·</span>
+                                <span className="font-bold text-green-600 dark:text-green-400">
+                                  LIVE
+                                </span>
+                              </>
+                            )}
+
+                            {result.rateLabel && (
+                              <>
+                                <span>·</span>
+                                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                  {result.rateLabel}
+                                </span>
+                              </>
+                            )}
+
+                            {result.isLive &&
+                              typeof result.freeSpaces ===
+                                "number" &&
+                              typeof result.capacity ===
+                                "number" &&
+                              result.capacity > 0 && (
+                                <>
+                                  <span>·</span>
+                                  <span>
+                                    {result.freeSpaces} free
+                                  </span>
+                                </>
+                              )}
+
+                            <span>·</span>
 
                             <span className="font-semibold text-foreground">
                               {formatDistance(
