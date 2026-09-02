@@ -39,6 +39,10 @@ interface ParkingHeaderProps {
     nearbyItems: NearbyParkingResult[]
   ) => void;
   nearbyItems: NearbyParkingItem[];
+  onUserLocation?: (location: {
+    lat: number;
+    lng: number;
+  }) => void;
 }
 
 export const ParkingHeader = ({
@@ -46,6 +50,7 @@ export const ParkingHeader = ({
   isLoading,
   onFindNearby,
   nearbyItems,
+  onUserLocation,
 }: ParkingHeaderProps) => {
   const { theme, setTheme } = useTheme();
 
@@ -122,6 +127,14 @@ export const ParkingHeader = ({
           latitude,
           longitude,
         } = position.coords;
+
+        // Isolated Sprint 3 addition:
+        // expose the already-approved browser
+        // location without changing nearby logic.
+        onUserLocation?.({
+          lat: latitude,
+          lng: longitude,
+        });
 
         const itemsWithDistance =
           nearbyItems

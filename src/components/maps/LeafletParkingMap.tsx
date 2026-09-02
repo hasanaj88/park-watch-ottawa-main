@@ -9,6 +9,7 @@ import {
   Marker,
   Popup,
   Polyline,
+  CircleMarker,
   useMap,
 } from "react-leaflet";
 
@@ -32,7 +33,6 @@ type Props = {
   userLocation?: {
     lat: number;
     lng: number;
-    accuracy?: number;
   } | null;
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
@@ -931,7 +931,7 @@ export default function LeafletParkingMap({
               <Popup>
                 <div
                   style={{
-                    minWidth: 130,
+                    minWidth: 120,
                   }}
                 >
                   <div
@@ -940,7 +940,7 @@ export default function LeafletParkingMap({
                       fontSize: 14,
                     }}
                   >
-                    Your Location
+                    You Are Here
                   </div>
 
                   <div
@@ -950,7 +950,7 @@ export default function LeafletParkingMap({
                       color: "#64748b",
                     }}
                   >
-                    Used for Parking Near You
+                    Your current location
                   </div>
                 </div>
               </Popup>

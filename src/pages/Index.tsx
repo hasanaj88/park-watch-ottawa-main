@@ -927,6 +927,14 @@ const Index = () => {
     requestId: number;
   } | null>(null);
 
+  const [
+    userLocation,
+    setUserLocation,
+  ] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+
   const { toast } = useToast();
 
   const handleNavigate = (
@@ -1083,6 +1091,13 @@ const Index = () => {
           nearbyItems={
             nearbyParkingItems
           }
+          onUserLocation={(
+            location
+          ) => {
+            setUserLocation(
+              location
+            );
+          }}
           onFindNearby={(
             nearbyResults:
               NearbyParkingResult[]
@@ -1196,6 +1211,9 @@ const Index = () => {
                       }
                       focusLocation={
                         nearbyFocus
+                      }
+                      userLocation={
+                        userLocation
                       }
                       selectedLotId={String(
                         selectedLotId ??
