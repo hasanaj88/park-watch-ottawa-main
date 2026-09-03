@@ -71,6 +71,11 @@ export const ParkingHeader = ({
     setShowNearbyResults,
   ] = useState(false);
 
+  const [
+    nearbyMobileCollapsed,
+    setNearbyMobileCollapsed,
+  ] = useState(false);
+
   const { toast } = useToast();
 
   const formatDistance = (
@@ -120,6 +125,7 @@ export const ParkingHeader = ({
 
     setIsGettingLocation(true);
     setShowNearbyResults(false);
+    setNearbyMobileCollapsed(false);
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -442,133 +448,286 @@ export const ParkingHeader = ({
 
         {showNearbyResults &&
           nearbyResults.length > 0 && (
-            <div className="absolute right-4 top-[calc(100%+8px)] z-[70] w-[min(92vw,380px)] rounded-2xl border bg-background/95 p-3 shadow-2xl backdrop-blur">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-bold">
-                    Parking Near You
+            <>
+              {/* Desktop / tablet: keep the current dropdown design. */}
+              <div className="absolute right-4 top-[calc(100%+8px)] z-[70] hidden w-[min(92vw,380px)] rounded-2xl border bg-background/95 p-3 shadow-2xl backdrop-blur sm:block">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="font-bold">
+                      Parking Near You
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Best nearby options within 2 km
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Best nearby options within 2 km
-                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() =>
+                      setShowNearbyResults(
+                        false
+                      )
+                    }
+                    aria-label="Close nearby parking"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() =>
-                    setShowNearbyResults(
-                      false
-                    )
-                  }
-                  aria-label="Close nearby parking"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+                <div className="space-y-2">
+                  {nearbyResults.map(
+                    (result, index) => {
+                      const isFree =
+                        result.kind ===
+                        "15min";
 
-              <div className="space-y-2">
-                {nearbyResults.map(
-                  (result, index) => {
-                    const isFree =
-                      result.kind ===
-                      "15min";
+                      const isPaid =
+                        result.kind ===
+                        "paid";
 
-                    const isPaid =
-                      result.kind ===
-                      "paid";
-
-                    return (
-                      <button
-                        key={result.id}
-                        type="button"
-                        onClick={() => {
-                          /*
-                           * Keep the Nearby Results
-                           * panel open while focusing
-                           * the selected parking item.
-                           */
-                          onFindNearby([
-                            result,
-                          ]);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:bg-accent"
-                      >
-                        <div
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-extrabold text-white ${
-                            isFree
-                              ? "bg-green-600"
-                              : isPaid
-                              ? "bg-blue-600"
-                              : "bg-slate-800"
-                          }`}
+                      return (
+                        <button
+                          key={result.id}
+                          type="button"
+                          onClick={() => {
+                            onFindNearby([
+                              result,
+                            ]);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:bg-accent"
                         >
-                          {index + 1}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-semibold">
-                            {result.name}
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-extrabold text-white ${
+                              isFree
+                                ? "bg-green-600"
+                                : isPaid
+                                ? "bg-blue-600"
+                                : "bg-slate-800"
+                            }`}
+                          >
+                            {index + 1}
                           </div>
 
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                            <span>
-                              {getTypeLabel(
-                                result.kind
-                              )}
-                            </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold">
+                              {result.name}
+                            </div>
 
-                            {result.isLive && (
-                              <>
-                                <span>·</span>
-                                <span className="font-bold text-green-600 dark:text-green-400">
-                                  LIVE
-                                </span>
-                              </>
-                            )}
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                              <span>
+                                {getTypeLabel(
+                                  result.kind
+                                )}
+                              </span>
 
-                            {result.rateLabel && (
-                              <>
-                                <span>·</span>
-                                <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                  {result.rateLabel}
-                                </span>
-                              </>
-                            )}
-
-                            {result.isLive &&
-                              typeof result.freeSpaces ===
-                                "number" &&
-                              typeof result.capacity ===
-                                "number" &&
-                              result.capacity > 0 && (
+                              {result.isLive && (
                                 <>
                                   <span>·</span>
-                                  <span>
-                                    {result.freeSpaces} free
+                                  <span className="font-bold text-green-600 dark:text-green-400">
+                                    LIVE
                                   </span>
                                 </>
                               )}
 
-                            <span>·</span>
-
-                            <span className="font-semibold text-foreground">
-                              {formatDistance(
-                                result.distanceKm
+                              {result.rateLabel && (
+                                <>
+                                  <span>·</span>
+                                  <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                    {result.rateLabel}
+                                  </span>
+                                </>
                               )}
-                            </span>
+
+                              {result.isLive &&
+                                typeof result.freeSpaces ===
+                                  "number" &&
+                                typeof result.capacity ===
+                                  "number" &&
+                                result.capacity > 0 && (
+                                  <>
+                                    <span>·</span>
+                                    <span>
+                                      {result.freeSpaces} free
+                                    </span>
+                                  </>
+                                )}
+
+                              <span>·</span>
+
+                              <span className="font-semibold text-foreground">
+                                {formatDistance(
+                                  result.distanceKm
+                                )}
+                              </span>
+                            </div>
                           </div>
+
+                          <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile: compact bottom sheet. */}
+              {!nearbyMobileCollapsed && (
+                <div className="fixed inset-x-0 bottom-0 z-[120] sm:hidden">
+                  <button
+                    type="button"
+                    aria-label="Close nearby parking"
+                    className="absolute inset-0 -top-[100vh] bg-black/15"
+                    onClick={() =>
+                      setShowNearbyResults(
+                        false
+                      )
+                    }
+                  />
+
+                  <div className="relative mx-auto flex max-h-[62dvh] w-full flex-col rounded-t-[24px] border border-b-0 bg-background/98 shadow-[0_-12px_40px_rgba(15,23,42,0.22)] backdrop-blur-xl">
+                    <div className="flex shrink-0 items-center justify-between gap-3 border-b px-4 pb-3 pt-2">
+                      <div className="min-w-0">
+                        <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-muted-foreground/25" />
+
+                        <div className="text-base font-bold">
+                          Parking Near You
                         </div>
 
-                        <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </button>
-                    );
+                        <div className="text-xs text-muted-foreground">
+                          {nearbyResults.length} nearby option{nearbyResults.length === 1 ? "" : "s"} within 2 km
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 rounded-full"
+                        onClick={() =>
+                          setShowNearbyResults(
+                            false
+                          )
+                        }
+                        aria-label="Close nearby parking"
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(14px+env(safe-area-inset-bottom))]">
+                      {nearbyResults.map(
+                        (result, index) => {
+                          const isFree =
+                            result.kind ===
+                            "15min";
+
+                          const isPaid =
+                            result.kind ===
+                            "paid";
+
+                          return (
+                            <button
+                              key={result.id}
+                              type="button"
+                              onClick={() => {
+                                onFindNearby([
+                                  result,
+                                ]);
+
+                                /*
+                                 * On phones, collapse after selection
+                                 * so the map popup has room to display.
+                                 */
+                                setNearbyMobileCollapsed(
+                                  true
+                                );
+                              }}
+                              className="flex w-full items-center gap-3 rounded-2xl border bg-card px-3 py-3 text-left active:bg-accent"
+                            >
+                              <div
+                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-white ${
+                                  isFree
+                                    ? "bg-green-600"
+                                    : isPaid
+                                    ? "bg-blue-600"
+                                    : "bg-slate-800"
+                                }`}
+                              >
+                                {index + 1}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[14px] font-semibold leading-5">
+                                  {result.name}
+                                </div>
+
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                  <span>
+                                    {getTypeLabel(
+                                      result.kind
+                                    )}
+                                  </span>
+
+                                  {result.isLive && (
+                                    <>
+                                      <span>·</span>
+                                      <span className="font-bold text-green-600 dark:text-green-400">
+                                        LIVE
+                                      </span>
+                                    </>
+                                  )}
+
+                                  {result.rateLabel && (
+                                    <>
+                                      <span>·</span>
+                                      <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                        {result.rateLabel}
+                                      </span>
+                                    </>
+                                  )}
+
+                                  <span>·</span>
+
+                                  <span className="font-semibold text-foreground">
+                                    {formatDistance(
+                                      result.distanceKm
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile collapsed state after selecting a result. */}
+              {nearbyMobileCollapsed && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNearbyMobileCollapsed(
+                      false
+                    )
                   }
-                )}
-              </div>
-            </div>
+                  className="fixed bottom-[calc(14px+env(safe-area-inset-bottom))] left-1/2 z-[120] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border bg-background/95 px-4 py-2.5 text-sm font-semibold shadow-xl backdrop-blur sm:hidden"
+                >
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  Parking Near You · {nearbyResults.length}
+                  <span className="text-muted-foreground">
+                    ↑
+                  </span>
+                </button>
+              )}
+            </>
           )}
+
       </div>
     </header>
   );
