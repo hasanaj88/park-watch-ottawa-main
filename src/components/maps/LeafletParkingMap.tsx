@@ -41,6 +41,16 @@ type Props = {
     lng: number;
   } | null;
   destination?: OttawaDestinationResult | null;
+  destinationParkingItems?: Array<{
+    id: string;
+    name: string;
+    address?: string | null;
+    coordinates: {
+      lat: number;
+      lng: number;
+    };
+    isDiscovered?: boolean;
+  }>;
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
 };
@@ -286,6 +296,7 @@ export default function LeafletParkingMap({
   focusLocation,
   userLocation,
   destination,
+  destinationParkingItems = [],
   selectedLotId,
   onLotSelect,
 }: Props) {
@@ -1702,6 +1713,135 @@ export default function LeafletParkingMap({
             </Marker>
           );
         })}
+
+        {/* Destination-discovered OpenStreetMap parking */}
+        {destinationParkingItems.map(
+          (parking) => {
+            const lat = Number(
+              parking.coordinates?.lat
+            );
+
+            const lng = Number(
+              parking.coordinates?.lng
+            );
+
+            if (
+              !Number.isFinite(lat) ||
+              !Number.isFinite(lng)
+            ) {
+              return null;
+            }
+
+            const position:
+              [number, number] = [
+                lat,
+                lng,
+              ];
+
+            const navigateToParking =
+              () => {
+                const url =
+                  `https://www.google.com/maps/dir/?api=1` +
+                  `&destination=${lat},${lng}`;
+
+                window.open(
+                  url,
+                  "_blank",
+                  "noopener,noreferrer"
+                );
+              };
+
+            return (
+              <Marker
+                key={parking.id}
+                position={position}
+                icon={normalParkingIcon}
+                ref={(layer) => {
+                  lotLayerRefs.current[
+                    parking.id
+                  ] = layer;
+                }}
+              >
+                <Popup>
+                  <div
+                    style={{
+                      width: isMobile
+                        ? "min(230px, calc(100vw - 96px))"
+                        : undefined,
+                      minWidth: isMobile
+                        ? 0
+                        : 190,
+                      maxWidth: isMobile
+                        ? "calc(100vw - 96px)"
+                        : 280,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 800,
+                        fontSize: 15,
+                      }}
+                    >
+                      {parking.name}
+                    </div>
+
+                    {parking.address &&
+                      parking.address !==
+                        parking.name && (
+                        <div
+                          style={{
+                            marginTop: 5,
+                            fontSize: 12,
+                            color:
+                              "#64748b",
+                          }}
+                        >
+                          {
+                            parking.address
+                          }
+                        </div>
+                      )}
+
+                    <div
+                      style={{
+                        marginTop: 7,
+                        fontSize: 11,
+                        color: "#64748b",
+                      }}
+                    >
+                      Parking discovered from
+                      OpenStreetMap
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        navigateToParking
+                      }
+                      style={{
+                        width: "100%",
+                        marginTop: 10,
+                        padding:
+                          "8px 10px",
+                        border: "none",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        background:
+                          "#0f172a",
+                        color:
+                          "#ffffff",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Navigate
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          }
+        )}
 
         {/* 15 Minute Free Parking */}
         {showFifteenMin &&

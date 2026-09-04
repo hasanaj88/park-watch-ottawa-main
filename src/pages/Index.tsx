@@ -952,6 +952,13 @@ const Index = () => {
     OttawaDestinationResult | null
   >(null);
 
+  const [
+    destinationParkingItems,
+    setDestinationParkingItems,
+  ] = useState<
+    NearbyParkingItem[]
+  >([]);
+
   const { toast } = useToast();
 
   const handleNavigate = (
@@ -996,6 +1003,12 @@ const Index = () => {
       destination
     );
 
+    // Clear discovery from the previous destination;
+    // ParkingHeader will repopulate it for the new one.
+    setDestinationParkingItems(
+      []
+    );
+
     clearSelectedLot();
 
     setActiveTab(
@@ -1019,6 +1032,13 @@ const Index = () => {
           onDestinationSelect={
             handleDestinationSelect
           }
+          onDestinationParkingDiscovered={(
+            items
+          ) => {
+            setDestinationParkingItems(
+              items
+            );
+          }}
           onUserLocation={(
             location
           ) => {
@@ -1127,6 +1147,9 @@ const Index = () => {
                       }
                       destination={
                         selectedDestination
+                      }
+                      destinationParkingItems={
+                        destinationParkingItems
                       }
                       selectedLotId={String(
                         selectedLotId ??

@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { calculateDistance } from "@/utils/distance";
 import { searchOttawaDestinations, type OttawaDestinationResult } from "@/services/ottawaDestinationSearch";
+import { discoverOttawaDestinationParking } from "@/services/ottawaDestinationParking";
 
 export type NearbyParkingKind =
   | "lot"
@@ -27,6 +28,8 @@ export type NearbyParkingItem = {
   isCityOfficial?: boolean;
   freeSpaces?: number | null;
   capacity?: number | null;
+  address?: string | null;
+  isDiscovered?: boolean;
 };
 
 export type NearbyParkingResult =
@@ -52,6 +55,9 @@ interface ParkingHeaderProps {
   onDestinationSelect?: (
     destination: OttawaDestinationResult
   ) => void;
+  onDestinationParkingDiscovered?: (
+    items: NearbyParkingItem[]
+  ) => void;
 }
 
 export const ParkingHeader = ({
@@ -61,6 +67,7 @@ export const ParkingHeader = ({
   nearbyItems,
   onUserLocation,
   onDestinationSelect,
+  onDestinationParkingDiscovered,
 }: ParkingHeaderProps) => {
   const { theme, setTheme } = useTheme();
 
@@ -116,6 +123,11 @@ export const ParkingHeader = ({
       null
     );
 
+  const parkingDiscoveryAbortRef =
+    useRef<AbortController | null>(
+      null
+    );
+
   const suppressDestinationSearchRef = useRef(false);
 
   const { toast } = useToast();
@@ -140,8 +152,11 @@ export const ParkingHeader = ({
       ? "Paid Street"
       : "Parking Lot";
 
-  const rankNearbyItems = (origin: { lat: number; lng: number }) => {
-    const itemsWithDistance = nearbyItems
+  const rankNearbyItems = (
+    origin: { lat: number; lng: number },
+    sourceItems: NearbyParkingItem[] = nearbyItems
+  ) => {
+    const itemsWithDistance = sourceItems
       .filter((item) => {
         const lat = Number(item.coordinates?.lat);
         const lng = Number(item.coordinates?.lng);
@@ -360,10 +375,11 @@ export const ParkingHeader = ({
   useEffect(() => {
     return () => {
       destinationAbortRef.current?.abort();
+      parkingDiscoveryAbortRef.current?.abort();
     };
   }, []);
 
-  const handleDestinationSelect = (
+  const handleDestinationSelect = async (
     destination: OttawaDestinationResult
   ) => {
     suppressDestinationSearchRef.current = true;
@@ -371,19 +387,160 @@ export const ParkingHeader = ({
     setDestinationResults([]);
     setShowDestinationResults(false);
 
-    const nearby = rankNearbyItems(destination.coordinates);
-    setNearbyResults(nearby);
-    setNearbyContext({ kind: "destination", label: destination.label });
-    setNearbyMobileCollapsed(false);
-    setShowNearbyResults(nearby.length > 0);
-    onDestinationSelect?.(destination);
+    parkingDiscoveryAbortRef.current?.abort();
 
-    if (!nearby.length) {
-      toast({
-        title: "No Parking Near Destination",
-        description: "No parking options were found within 2 km of this destination.",
-        duration: 3500,
-      });
+    const discoveryController =
+      new AbortController();
+
+    parkingDiscoveryAbortRef.current =
+      discoveryController;
+
+    setNearbyContext({
+      kind: "destination",
+      label: destination.label,
+    });
+
+    setNearbyMobileCollapsed(false);
+
+    // Show the already-known Sprint 4 inventory immediately.
+    const baseNearby =
+      rankNearbyItems(
+        destination.coordinates
+      );
+
+    setNearbyResults(baseNearby);
+    setShowNearbyResults(
+      baseNearby.length > 0
+    );
+
+    // Move the map immediately while extra OSM parking
+    // discovery happens in parallel.
+    onDestinationSelect?.(
+      destination
+    );
+
+    try {
+      const discovered =
+        await discoverOttawaDestinationParking(
+          destination.coordinates,
+          {
+            radiusKm: 2,
+            limit: 30,
+            signal:
+              discoveryController.signal,
+          }
+        );
+
+      if (
+        discoveryController.signal.aborted
+      ) {
+        return;
+      }
+
+      /*
+       * Prevent duplicate facilities when an OSM parking
+       * object is already represented by one of our project
+       * / City lots. 80 metres is intentionally conservative:
+       * it catches alternate entrance/centroid coordinates
+       * without merging genuinely separate nearby garages.
+       */
+      const discoveredItems:
+        NearbyParkingItem[] =
+        discovered
+          .filter((parking) => {
+            return !nearbyItems.some(
+              (existing) => {
+                if (
+                  existing.kind !==
+                  "lot"
+                ) {
+                  return false;
+                }
+
+                const distanceKm =
+                  calculateDistance(
+                    parking.coordinates.lat,
+                    parking.coordinates.lng,
+                    existing.coordinates.lat,
+                    existing.coordinates.lng
+                  );
+
+                return (
+                  distanceKm <= 0.08
+                );
+              }
+            );
+          })
+          .map((parking) => ({
+            id: parking.id,
+            name: parking.name,
+            kind: "lot" as const,
+            groupKey:
+              parking.id,
+            coordinates:
+              parking.coordinates,
+            address:
+              parking.address,
+            isDiscovered: true,
+            isLive: false,
+            isCityOfficial: false,
+            freeSpaces: null,
+            capacity: null,
+          }));
+
+      onDestinationParkingDiscovered?.(
+        discoveredItems
+      );
+
+      const mergedItems = [
+        ...nearbyItems,
+        ...discoveredItems,
+      ];
+
+      const nearby =
+        rankNearbyItems(
+          destination.coordinates,
+          mergedItems
+        );
+
+      setNearbyResults(nearby);
+      setShowNearbyResults(
+        nearby.length > 0
+      );
+
+      if (!nearby.length) {
+        toast({
+          title:
+            "No Parking Near Destination",
+          description:
+            "No parking options were found within 2 km of this destination.",
+          duration: 3500,
+        });
+      }
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      // Photon discovery is an enhancement. Keep the
+      // existing City/project results if the public service
+      // is temporarily unavailable.
+      onDestinationParkingDiscovered?.(
+        []
+      );
+
+      if (!baseNearby.length) {
+        toast({
+          title:
+            "Limited Parking Data",
+          description:
+            "Extra nearby parking could not be loaded right now.",
+          duration: 3500,
+        });
+      }
     }
   };
 
