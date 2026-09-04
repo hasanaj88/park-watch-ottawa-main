@@ -34,6 +34,10 @@ export type NearbyParkingResult =
     distanceKm: number;
   };
 
+type NearbyContext =
+  | { kind: "user" }
+  | { kind: "destination"; label: string };
+
 interface ParkingHeaderProps {
   onRefresh: () => void;
   isLoading: boolean;
@@ -82,6 +86,9 @@ export const ParkingHeader = ({
     setNearbyMobileCollapsed,
   ] = useState(false);
 
+  const [nearbyContext, setNearbyContext] =
+    useState<NearbyContext>({ kind: "user" });
+
   const [
     destinationQuery,
     setDestinationQuery,
@@ -109,6 +116,8 @@ export const ParkingHeader = ({
       null
     );
 
+  const suppressDestinationSearchRef = useRef(false);
+
   const { toast } = useToast();
 
   const formatDistance = (
@@ -130,6 +139,41 @@ export const ParkingHeader = ({
       : kind === "paid"
       ? "Paid Street"
       : "Parking Lot";
+
+  const rankNearbyItems = (origin: { lat: number; lng: number }) => {
+    const itemsWithDistance = nearbyItems
+      .filter((item) => {
+        const lat = Number(item.coordinates?.lat);
+        const lng = Number(item.coordinates?.lng);
+        return Number.isFinite(lat) && Number.isFinite(lng);
+      })
+      .map((item) => ({
+        ...item,
+        distanceKm: calculateDistance(origin.lat, origin.lng, item.coordinates.lat, item.coordinates.lng),
+      }));
+
+    const closestByGroup = new Map<string, NearbyParkingResult>();
+    for (const item of itemsWithDistance) {
+      const key = item.groupKey ?? item.id;
+      const current = closestByGroup.get(key);
+      if (!current || item.distanceKm < current.distanceKm) closestByGroup.set(key, item);
+    }
+
+    const smartScore = (item: NearbyParkingResult) => {
+      let bonusKm = 0;
+      if (item.isLive) bonusKm += 0.08;
+      if (item.kind === "15min") bonusKm += 0.04;
+      return item.distanceKm - bonusKm;
+    };
+
+    return Array.from(closestByGroup.values())
+      .sort((a, b) => {
+        const scoreDiff = smartScore(a) - smartScore(b);
+        return Math.abs(scoreDiff) > 0.001 ? scoreDiff : a.distanceKm - b.distanceKm;
+      })
+      .filter((item) => item.distanceKm <= 2)
+      .slice(0, 5);
+  };
 
   const handleFindNearby = async () => {
     if (!navigator.geolocation) {
@@ -175,119 +219,8 @@ export const ParkingHeader = ({
           lng: longitude,
         });
 
-        const itemsWithDistance =
-          nearbyItems
-            .filter((item) => {
-              const lat = Number(
-                item.coordinates?.lat
-              );
-
-              const lng = Number(
-                item.coordinates?.lng
-              );
-
-              return (
-                Number.isFinite(lat) &&
-                Number.isFinite(lng)
-              );
-            })
-            .map((item) => ({
-              ...item,
-
-              distanceKm:
-                calculateDistance(
-                  latitude,
-                  longitude,
-                  item.coordinates.lat,
-                  item.coordinates.lng
-                ),
-            }));
-
-        /*
-         * Smart Nearby Ranking
-         *
-         * 1. Collapse repeated nearby street
-         *    segments into one useful choice.
-         * 2. Keep the closest member of each group.
-         * 3. Distance stays the main factor, with
-         *    a small preference for LIVE and free
-         *    15-minute parking when similarly close.
-         */
-        const closestByGroup =
-          new Map<
-            string,
-            NearbyParkingResult
-          >();
-
-        for (
-          const item of itemsWithDistance
-        ) {
-          const key =
-            item.groupKey ??
-            item.id;
-
-          const current =
-            closestByGroup.get(key);
-
-          if (
-            !current ||
-            item.distanceKm <
-              current.distanceKm
-          ) {
-            closestByGroup.set(
-              key,
-              item
-            );
-          }
-        }
-
-        const smartScore = (
-          item: NearbyParkingResult
-        ) => {
-          let bonusKm = 0;
-
-          if (item.isLive) {
-            bonusKm += 0.08;
-          }
-
-          if (
-            item.kind === "15min"
-          ) {
-            bonusKm += 0.04;
-          }
-
-          return (
-            item.distanceKm -
-            bonusKm
-          );
-        };
-
-        const nearby =
-          Array.from(
-            closestByGroup.values()
-          )
-            .sort((a, b) => {
-              const scoreDiff =
-                smartScore(a) -
-                smartScore(b);
-
-              if (
-                Math.abs(scoreDiff) >
-                0.001
-              ) {
-                return scoreDiff;
-              }
-
-              return (
-                a.distanceKm -
-                b.distanceKm
-              );
-            })
-            .filter(
-              (item) =>
-                item.distanceKm <= 2
-            )
-            .slice(0, 5);
+        const nearby = rankNearbyItems({ lat: latitude, lng: longitude });
+        setNearbyContext({ kind: "user" });
 
         setIsGettingLocation(false);
 
@@ -352,6 +285,14 @@ export const ParkingHeader = ({
   };
 
   useEffect(() => {
+    if (suppressDestinationSearchRef.current) {
+      suppressDestinationSearchRef.current = false;
+      setDestinationResults([]);
+      setShowDestinationResults(false);
+      setDestinationLoading(false);
+      return;
+    }
+
     const cleanQuery =
       destinationQuery.trim();
 
@@ -425,14 +366,25 @@ export const ParkingHeader = ({
   const handleDestinationSelect = (
     destination: OttawaDestinationResult
   ) => {
-    setDestinationQuery(
-      destination.address
-    );
+    suppressDestinationSearchRef.current = true;
+    setDestinationQuery(destination.address);
     setDestinationResults([]);
     setShowDestinationResults(false);
-    onDestinationSelect?.(
-      destination
-    );
+
+    const nearby = rankNearbyItems(destination.coordinates);
+    setNearbyResults(nearby);
+    setNearbyContext({ kind: "destination", label: destination.label });
+    setNearbyMobileCollapsed(false);
+    setShowNearbyResults(nearby.length > 0);
+    onDestinationSelect?.(destination);
+
+    if (!nearby.length) {
+      toast({
+        title: "No Parking Near Destination",
+        description: "No parking options were found within 2 km of this destination.",
+        duration: 3500,
+      });
+    }
   };
 
   const isDark = theme === "dark";
@@ -571,6 +523,7 @@ export const ParkingHeader = ({
               type="search"
               value={destinationQuery}
               onChange={(event) => {
+                suppressDestinationSearchRef.current = false;
                 setDestinationQuery(
                   event.target.value
                 );
@@ -674,10 +627,14 @@ export const ParkingHeader = ({
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
                     <div className="font-bold">
-                      Parking Near You
+                      {nearbyContext.kind === "destination"
+                        ? `Parking near ${nearbyContext.label}`
+                        : "Parking Near You"}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Best nearby options within 2 km
+                      {nearbyContext.kind === "destination"
+                        ? `${nearbyResults.length} options within 2 km`
+                        : "Best nearby options within 2 km"}
                     </div>
                   </div>
 
@@ -822,11 +779,15 @@ export const ParkingHeader = ({
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="text-base font-bold">
-                                    Parking Near You
+                                    {nearbyContext.kind === "destination"
+                                      ? `Parking near ${nearbyContext.label}`
+                                      : "Parking Near You"}
                                   </div>
 
                                   <div className="text-xs text-muted-foreground">
-                                    {nearbyResults.length} nearby option{nearbyResults.length === 1 ? "" : "s"} within 2 km
+                                    {nearbyContext.kind === "destination"
+                                      ? `${nearbyResults.length} option${nearbyResults.length === 1 ? "" : "s"} within 2 km`
+                                      : `${nearbyResults.length} nearby option${nearbyResults.length === 1 ? "" : "s"} within 2 km`}
                                   </div>
                                 </div>
 
@@ -962,10 +923,8 @@ export const ParkingHeader = ({
                         className="fixed bottom-[calc(14px+env(safe-area-inset-bottom))] left-1/2 z-[120] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border bg-background/95 px-4 py-2.5 text-sm font-semibold shadow-xl backdrop-blur sm:hidden"
                       >
                         <MapPin className="h-4 w-4 text-green-600" />
-                        Nearby ·{" "}
-                        {
-                          nearbyResults.length
-                        }
+                        {nearbyContext.kind === "destination" ? "Near destination" : "Nearby"} ·{" "}
+                        {nearbyResults.length}
                         <span className="text-muted-foreground">
                           ↑
                         </span>
