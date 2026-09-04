@@ -18,11 +18,17 @@ import L from "leaflet";
 import type { ParkingLot } from "@/types/parking";
 import type { Ottawa15MinParkingSegment } from "@/services/ottawa15MinParking";
 import type { OttawaPaidStreetParkingSegment } from "@/services/ottawaPaidStreetParking";
+import type { OttawaTrafficEventFeature } from "@/services/ottawaTrafficEvents";
+import type { OttawaDestinationResult } from "@/services/ottawaDestinationSearch";
+import ParkPulseLayer from "@/components/maps/ParkPulseLayer";
 
 type Props = {
   lots: ParkingLot[];
   fifteenMinSegments: Ottawa15MinParkingSegment[];
   paidStreetSegments: OttawaPaidStreetParkingSegment[];
+  liveParkingLastUpdated?: Date | null;
+  trafficEvents?: OttawaTrafficEventFeature[];
+  trafficEventsLastUpdated?: Date | null;
   focusLocation?: {
     lat: number;
     lng: number;
@@ -34,6 +40,7 @@ type Props = {
     lat: number;
     lng: number;
   } | null;
+  destination?: OttawaDestinationResult | null;
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
 };
@@ -161,12 +168,124 @@ function FocusNearbyLocation({
   return null;
 }
 
+function ParkPulseMapModeController({
+  enabled,
+}: {
+  enabled: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+
+    container.classList.toggle(
+      "parkpulse-map-mode",
+      enabled
+    );
+
+    if (enabled) {
+      map.closePopup();
+      map.flyTo([45.4215, -75.6972], 12, {
+        animate: true,
+        duration: 0.7,
+      });
+    }
+
+    return () => {
+      container.classList.remove(
+        "parkpulse-map-mode"
+      );
+    };
+  }, [map, enabled]);
+
+  return null;
+}
+
+
+function ParkPulseFocusBounds({
+  enabled,
+}: {
+  enabled: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    // Central Ottawa ParkPulse viewing window:
+    // Westboro -> Downtown / ByWard -> Vanier,
+    // with Glebe / Old Ottawa South included to the south.
+    const bounds = L.latLngBounds(
+      [45.365, -75.795],
+      [45.455, -75.645]
+    );
+
+    const timer = window.setTimeout(() => {
+      map.fitBounds(bounds, {
+        padding: [28, 28],
+        maxZoom: 14,
+        animate: true,
+      });
+    }, 80);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [enabled, map]);
+
+  return null;
+}
+
+function FocusDestination({
+  destination,
+}: {
+  destination?:
+    | OttawaDestinationResult
+    | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!destination) {
+      return;
+    }
+
+    map.flyTo(
+      [
+        destination.coordinates.lat,
+        destination.coordinates.lng,
+      ],
+      Math.max(
+        map.getZoom(),
+        16
+      ),
+      {
+        animate: true,
+        duration: 0.8,
+      }
+    );
+  }, [
+    destination?.id,
+    destination?.coordinates.lat,
+    destination?.coordinates.lng,
+    map,
+  ]);
+
+  return null;
+}
+
 export default function LeafletParkingMap({
   lots,
   fifteenMinSegments,
   paidStreetSegments,
+  liveParkingLastUpdated,
+  trafficEvents = [],
+  trafficEventsLastUpdated = null,
   focusLocation,
   userLocation,
+  destination,
   selectedLotId,
   onLotSelect,
 }: Props) {
@@ -193,6 +312,9 @@ export default function LeafletParkingMap({
   const [showPaidStreet, setShowPaidStreet] =
     useState(false);
 
+  const [showParkPulse, setShowParkPulse] =
+    useState(false);
+
   const [isMobile, setIsMobile] =
     useState(() =>
       typeof window !== "undefined"
@@ -209,6 +331,13 @@ export default function LeafletParkingMap({
 
   useEffect(() => {
     if (
+      focusLocation ||
+      destination
+    ) {
+      setShowParkPulse(false);
+    }
+
+    if (
       focusLocation?.kind ===
       "15min"
     ) {
@@ -224,6 +353,7 @@ export default function LeafletParkingMap({
   }, [
     focusLocation?.kind,
     focusLocation?.requestId,
+    destination?.id,
   ]);
 
   useEffect(() => {
@@ -559,6 +689,20 @@ export default function LeafletParkingMap({
     return `${hours} hours`;
   };
 
+  const parkPulseUpdatedText =
+    liveParkingLastUpdated &&
+    !Number.isNaN(
+      liveParkingLastUpdated.getTime()
+    )
+      ? liveParkingLastUpdated.toLocaleTimeString(
+          [],
+          {
+            hour: "numeric",
+            minute: "2-digit",
+          }
+        )
+      : null;
+
   return (
     <div
       style={{
@@ -569,7 +713,24 @@ export default function LeafletParkingMap({
         position: "relative",
       }}
     >
+      <style>{`
+        .parkpulse-map-mode {
+          background: #07111f;
+        }
+
+        .parkpulse-map-mode .leaflet-tile-pane img {
+          filter: grayscale(1) brightness(0.28) contrast(1.38) saturate(0.08);
+        }
+
+        .parkpulse-map-mode .leaflet-control-zoom a {
+          background: rgba(8, 15, 28, 0.94);
+          color: #ffffff;
+          border-color: rgba(255,255,255,0.12);
+        }
+      `}</style>
+
       {/* Map Legend */}
+      {!showParkPulse && (
       <div
         style={{
           position: "absolute",
@@ -818,7 +979,10 @@ export default function LeafletParkingMap({
           </div>
         )}
       </div>
+      )}
 
+      {!showParkPulse && (
+        <>
       {/* 15 Minute Free Toggle */}
       <button
         type="button"
@@ -891,6 +1055,122 @@ export default function LeafletParkingMap({
           : "$ Paid Parking"}
       </button>
 
+        </>
+      )}
+
+      {!showParkPulse ? (
+        <button
+          type="button"
+          onClick={() => setShowParkPulse(true)}
+          style={{
+            position: "absolute",
+            top: isMobile ? 86 : 104,
+            right: isMobile ? 10 : 12,
+            zIndex: 1000,
+            border: "1px solid rgba(255,255,255,0.18)",
+            borderRadius: isMobile ? 9 : 10,
+            padding: isMobile ? "7px 10px" : "9px 13px",
+            fontSize: isMobile ? 11 : 13,
+            fontWeight: 800,
+            cursor: "pointer",
+            background: "rgba(15,23,42,0.94)",
+            color: "#ffffff",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          ◉ ParkPulse
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowParkPulse(false)}
+            style={{
+              position: "absolute",
+              top: isMobile ? 10 : 12,
+              right: isMobile ? 10 : 12,
+              zIndex: 1000,
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 10,
+              padding: isMobile ? "8px 11px" : "9px 13px",
+              fontSize: isMobile ? 11 : 13,
+              fontWeight: 800,
+              cursor: "pointer",
+              background: "rgba(8,15,28,0.92)",
+              color: "#ffffff",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.34)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            ← Parking Map
+          </button>
+
+          <div
+            style={{
+              position: "absolute",
+              left: isMobile ? 10 : 12,
+              bottom: isMobile ? 28 : 24,
+              zIndex: 1000,
+              width: isMobile ? 205 : 230,
+              padding: "10px 12px",
+              borderRadius: 11,
+              background: "rgba(8,15,28,0.90)",
+              color: "#ffffff",
+              border: "1px solid rgba(255,255,255,0.12)",
+              boxShadow: "0 5px 18px rgba(0,0,0,0.32)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 900 }}>
+              ParkPulse™
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 10,
+                color: "rgba(255,255,255,0.66)",
+              }}
+            >
+              Parking pressure · Live-informed model
+              {parkPulseUpdatedText && (
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 9,
+                    color:
+                      "rgba(255,255,255,0.52)",
+                  }}
+                >
+                  Updated {parkPulseUpdatedText}
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                height: 8,
+                marginTop: 8,
+                borderRadius: 999,
+                background:
+                  "linear-gradient(90deg,#22c55e 0%,#84cc16 28%,#eab308 52%,#f97316 75%,#ef4444 100%)",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 4,
+                fontSize: 9,
+                color: "rgba(255,255,255,0.68)",
+              }}
+            >
+              <span>Easy</span>
+              <span>Critical</span>
+            </div>
+          </div>
+        </>
+      )}
+
       <MapContainer
         center={ottawa}
         zoom={13}
@@ -904,9 +1184,98 @@ export default function LeafletParkingMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <ParkPulseFocusBounds
+          enabled={showParkPulse}
+        />
+
+        <ParkPulseMapModeController
+          enabled={showParkPulse}
+        />
+
+        {showParkPulse ? (
+          <ParkPulseLayer
+            lots={lots}
+            paidStreetSegments={paidStreetSegments}
+            fifteenMinSegments={fifteenMinSegments}
+            trafficEvents={trafficEvents}
+            lastUpdated={liveParkingLastUpdated}
+            trafficEventsLastUpdated={
+              trafficEventsLastUpdated
+            }
+          />
+        ) : (
+          <>
         <FocusNearbyLocation
           target={focusLocation}
         />
+
+        <FocusDestination
+          destination={destination}
+        />
+
+        {destination &&
+          Number.isFinite(
+            destination.coordinates.lat
+          ) &&
+          Number.isFinite(
+            destination.coordinates.lng
+          ) && (
+            <CircleMarker
+              center={[
+                destination.coordinates.lat,
+                destination.coordinates.lng,
+              ]}
+              radius={10}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 3,
+                fillColor: "#f59e0b",
+                fillOpacity: 1,
+              }}
+            >
+              <Popup>
+                <div
+                  style={{
+                    minWidth: 190,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                    }}
+                  >
+                    🎯 Destination
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {destination.label}
+                  </div>
+
+                  {destination.address !==
+                    destination.label && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color: "#64748b",
+                      }}
+                    >
+                      {
+                        destination.address
+                      }
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </CircleMarker>
+          )}
 
         {userLocation &&
           Number.isFinite(
@@ -959,12 +1328,12 @@ export default function LeafletParkingMap({
 
         <FitFifteenMinBounds
           segments={fifteenMinSegments}
-          enabled={showFifteenMin}
+          enabled={false}
         />
 
         <FitPaidStreetBounds
           segments={paidStreetSegments}
-          enabled={showPaidStreet}
+          enabled={false}
         />
 
         {/* Existing parking lots */}
@@ -1694,6 +2063,8 @@ export default function LeafletParkingMap({
               );
             }
           )}
+          </>
+        )}
       </MapContainer>
     </div>
   );

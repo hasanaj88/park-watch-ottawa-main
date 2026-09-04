@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, RefreshCw, MapPin, X } from "lucide-react";
+import { Moon, Sun, RefreshCw, MapPin, X, Search, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { calculateDistance } from "@/utils/distance";
+import { searchOttawaDestinations, type OttawaDestinationResult } from "@/services/ottawaDestinationSearch";
 
 export type NearbyParkingKind =
   | "lot"
@@ -44,6 +45,9 @@ interface ParkingHeaderProps {
     lat: number;
     lng: number;
   }) => void;
+  onDestinationSelect?: (
+    destination: OttawaDestinationResult
+  ) => void;
 }
 
 export const ParkingHeader = ({
@@ -52,6 +56,7 @@ export const ParkingHeader = ({
   onFindNearby,
   nearbyItems,
   onUserLocation,
+  onDestinationSelect,
 }: ParkingHeaderProps) => {
   const { theme, setTheme } = useTheme();
 
@@ -76,6 +81,33 @@ export const ParkingHeader = ({
     nearbyMobileCollapsed,
     setNearbyMobileCollapsed,
   ] = useState(false);
+
+  const [
+    destinationQuery,
+    setDestinationQuery,
+  ] = useState("");
+
+  const [
+    destinationResults,
+    setDestinationResults,
+  ] = useState<
+    OttawaDestinationResult[]
+  >([]);
+
+  const [
+    destinationLoading,
+    setDestinationLoading,
+  ] = useState(false);
+
+  const [
+    showDestinationResults,
+    setShowDestinationResults,
+  ] = useState(false);
+
+  const destinationAbortRef =
+    useRef<AbortController | null>(
+      null
+    );
 
   const { toast } = useToast();
 
@@ -319,6 +351,90 @@ export const ParkingHeader = ({
     );
   };
 
+  useEffect(() => {
+    const cleanQuery =
+      destinationQuery.trim();
+
+    if (cleanQuery.length < 3) {
+      destinationAbortRef.current?.abort();
+      setDestinationResults([]);
+      setDestinationLoading(false);
+      return;
+    }
+
+    const timeoutId =
+      window.setTimeout(async () => {
+        destinationAbortRef.current?.abort();
+
+        const controller =
+          new AbortController();
+
+        destinationAbortRef.current =
+          controller;
+
+        setDestinationLoading(true);
+
+        try {
+          const results =
+            await searchOttawaDestinations(
+              cleanQuery,
+              {
+                limit: 6,
+                signal:
+                  controller.signal,
+              }
+            );
+
+          if (!controller.signal.aborted) {
+            setDestinationResults(
+              results
+            );
+            setShowDestinationResults(
+              true
+            );
+          }
+        } catch (error) {
+          if (
+            error instanceof DOMException &&
+            error.name === "AbortError"
+          ) {
+            return;
+          }
+
+          setDestinationResults([]);
+        } finally {
+          if (!controller.signal.aborted) {
+            setDestinationLoading(
+              false
+            );
+          }
+        }
+      }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [destinationQuery]);
+
+  useEffect(() => {
+    return () => {
+      destinationAbortRef.current?.abort();
+    };
+  }, []);
+
+  const handleDestinationSelect = (
+    destination: OttawaDestinationResult
+  ) => {
+    setDestinationQuery(
+      destination.address
+    );
+    setDestinationResults([]);
+    setShowDestinationResults(false);
+    onDestinationSelect?.(
+      destination
+    );
+  };
+
   const isDark = theme === "dark";
 
   return (
@@ -445,6 +561,109 @@ export const ParkingHeader = ({
               </Button>
             </div>
           </div>
+        </div>
+
+        <div className="relative mx-auto mt-3 w-full max-w-3xl">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+            <input
+              type="search"
+              value={destinationQuery}
+              onChange={(event) => {
+                setDestinationQuery(
+                  event.target.value
+                );
+                setShowDestinationResults(
+                  true
+                );
+              }}
+              onFocus={() => {
+                if (
+                  destinationResults.length
+                ) {
+                  setShowDestinationResults(
+                    true
+                  );
+                }
+              }}
+              placeholder="Where are you going?"
+              className="h-11 w-full rounded-xl border bg-background pl-10 pr-10 text-sm shadow-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+              aria-label="Search destination in Ottawa"
+              autoComplete="off"
+            />
+
+            {destinationLoading ? (
+              <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+            ) : destinationQuery ? (
+              <button
+                type="button"
+                aria-label="Clear destination search"
+                onClick={() => {
+                  setDestinationQuery("");
+                  setDestinationResults([]);
+                  setShowDestinationResults(
+                    false
+                  );
+                }}
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+
+          {showDestinationResults &&
+            destinationQuery.trim().length >=
+              3 && (
+              <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[90] overflow-hidden rounded-xl border bg-background shadow-2xl">
+                {destinationResults.length >
+                0 ? (
+                  <div className="max-h-64 overflow-y-auto p-1.5">
+                    {destinationResults.map(
+                      (destination) => (
+                        <button
+                          key={
+                            destination.id
+                          }
+                          type="button"
+                          onClick={() =>
+                            handleDestinationSelect(
+                              destination
+                            )
+                          }
+                          className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
+                        >
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold">
+                              {
+                                destination.label
+                              }
+                            </div>
+
+                            {destination.address !==
+                              destination.label && (
+                              <div className="truncate text-xs text-muted-foreground">
+                                {
+                                  destination.address
+                                }
+                              </div>
+                            )}
+                          </div>
+
+                        </button>
+                      )
+                    )}
+                  </div>
+                ) : !destinationLoading ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">
+                    No matching Ottawa address found.
+                  </div>
+                ) : null}
+              </div>
+            )}
         </div>
 
         {showNearbyResults &&
