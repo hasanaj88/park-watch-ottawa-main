@@ -50,6 +50,14 @@ type Props = {
       lng: number;
     };
     isDiscovered?: boolean;
+    accessStatus?:
+      | "public"
+      | "customers"
+      | "permit"
+      | "residents"
+      | "restricted"
+      | "unknown";
+    accessLabel?: string | null;
   }>;
   selectedLotId: string;
   onLotSelect: (lotId: string) => void;
@@ -1802,6 +1810,24 @@ export default function LeafletParkingMap({
                           }
                         </div>
                       )}
+
+                    {parking.accessLabel && (
+                      <div
+                        style={{
+                          marginTop: 7,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color:
+                            parking.accessStatus === "public"
+                              ? "#16a34a"
+                              : parking.accessStatus === "unknown"
+                              ? "#d97706"
+                              : "#ea580c",
+                        }}
+                      >
+                        {parking.accessLabel}
+                      </div>
+                    )}
 
                     <div
                       style={{

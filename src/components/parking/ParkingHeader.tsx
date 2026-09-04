@@ -30,6 +30,14 @@ export type NearbyParkingItem = {
   capacity?: number | null;
   address?: string | null;
   isDiscovered?: boolean;
+  accessStatus?:
+    | "public"
+    | "customers"
+    | "permit"
+    | "residents"
+    | "restricted"
+    | "unknown";
+  accessLabel?: string | null;
 };
 
 export type NearbyParkingResult =
@@ -482,6 +490,10 @@ export const ParkingHeader = ({
             address:
               parking.address,
             isDiscovered: true,
+            accessStatus:
+              parking.accessStatus,
+            accessLabel:
+              parking.accessLabel,
             isLive: false,
             isCityOfficial: false,
             freeSpaces: null,
@@ -874,6 +886,24 @@ export const ParkingHeader = ({
                                 </>
                               )}
 
+                              {result.isDiscovered &&
+                                result.accessLabel && (
+                                  <>
+                                    <span>·</span>
+                                    <span
+                                      className={
+                                        result.accessStatus === "public"
+                                          ? "font-semibold text-green-600 dark:text-green-400"
+                                          : result.accessStatus === "unknown"
+                                          ? "font-semibold text-amber-600 dark:text-amber-400"
+                                          : "font-semibold text-orange-600 dark:text-orange-400"
+                                      }
+                                    >
+                                      {result.accessLabel}
+                                    </span>
+                                  </>
+                                )}
+
                               {result.isLive &&
                                 typeof result.freeSpaces ===
                                   "number" &&
@@ -1047,6 +1077,28 @@ export const ParkingHeader = ({
                                               </span>
                                             </>
                                           )}
+
+                                          {result.isDiscovered &&
+                                            result.accessLabel && (
+                                              <>
+                                                <span>
+                                                  ·
+                                                </span>
+                                                <span
+                                                  className={
+                                                    result.accessStatus === "public"
+                                                      ? "font-semibold text-green-600 dark:text-green-400"
+                                                      : result.accessStatus === "unknown"
+                                                      ? "font-semibold text-amber-600 dark:text-amber-400"
+                                                      : "font-semibold text-orange-600 dark:text-orange-400"
+                                                  }
+                                                >
+                                                  {
+                                                    result.accessLabel
+                                                  }
+                                                </span>
+                                              </>
+                                            )}
 
                                           <span>
                                             ·

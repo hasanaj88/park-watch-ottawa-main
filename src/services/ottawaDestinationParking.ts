@@ -10,6 +10,15 @@ export type OttawaDiscoveredParking = {
   };
   osmType: string | null;
   osmId: number | string | null;
+  entranceCount?: number;
+  accessStatus:
+    | "public"
+    | "customers"
+    | "permit"
+    | "residents"
+    | "restricted"
+    | "unknown";
+  accessLabel: string;
 };
 
 type OverpassElement = {
@@ -22,6 +31,10 @@ type OverpassElement = {
     lon?: number;
   };
   tags?: Record<string, string>;
+};
+
+type InternalDiscoveredParking = OttawaDiscoveredParking & {
+  discoveryType: "facility" | "entrance" | "site";
 };
 
 type OverpassResponse = {
@@ -76,6 +89,79 @@ const asText = (
 const normalizeAccess = (
   value: string | undefined
 ) => value?.trim().toLowerCase() ?? null;
+
+
+const classifyParkingAccess = (
+  tags: Record<string, string>
+): Pick<
+  OttawaDiscoveredParking,
+  "accessStatus" | "accessLabel"
+> => {
+  const access = normalizeAccess(tags.access);
+
+  if (
+    access === "yes" ||
+    access === "public" ||
+    access === "permissive"
+  ) {
+    return {
+      accessStatus: "public",
+      accessLabel: "Public parking",
+    };
+  }
+
+  if (
+    access === "customers" ||
+    access === "customer"
+  ) {
+    return {
+      accessStatus: "customers",
+      accessLabel: "Customers only",
+    };
+  }
+
+  if (
+    access === "permit" ||
+    access === "permit_holders"
+  ) {
+    return {
+      accessStatus: "permit",
+      accessLabel: "Permit required",
+    };
+  }
+
+  if (
+    access === "residents" ||
+    access === "resident"
+  ) {
+    return {
+      accessStatus: "residents",
+      accessLabel: "Residents only",
+    };
+  }
+
+  if (
+    access === "destination" ||
+    access === "delivery" ||
+    access === "employees" ||
+    access === "employee"
+  ) {
+    return {
+      accessStatus: "restricted",
+      accessLabel: "Restricted access",
+    };
+  }
+
+  /*
+   * Missing OSM access data is NOT treated as public.
+   * This is important around restaurants, shops and offices,
+   * where a mapped surface lot may belong to the property.
+   */
+  return {
+    accessStatus: "unknown",
+    accessLabel: "Access not verified",
+  };
+};
 
 const isUsableCarParking = (
   tags: Record<string, string>
@@ -251,6 +337,131 @@ const buildOverpassName = (
   return "Parking";
 };
 
+
+const distanceMeters = (
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+): number => {
+  const R = 6371000;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+const groupParkingFacilities = (
+  items: InternalDiscoveredParking[],
+  origin: { lat: number; lng: number }
+): OttawaDiscoveredParking[] => {
+  const rawFacilities = items.filter((item) => item.discoveryType !== "entrance");
+  const entrances = items.filter((item) => item.discoveryType === "entrance");
+
+  // OSM sometimes represents the same facility as both amenity=parking and site=parking.
+  // Collapse near-identical facility anchors before assigning entrances.
+  const facilities: InternalDiscoveredParking[] = [];
+  for (const candidate of rawFacilities.sort(
+    (a, b) => distanceMeters(a.coordinates, origin) - distanceMeters(b.coordinates, origin)
+  )) {
+    const duplicate = facilities.find(
+      (existing) => distanceMeters(existing.coordinates, candidate.coordinates) <= 60
+    );
+    if (!duplicate) facilities.push(candidate);
+  }
+
+  const assigned = new Set<string>();
+  const grouped: OttawaDiscoveredParking[] = facilities.map((facility) => {
+    const nearbyEntrances = entrances.filter(
+      (entrance) => distanceMeters(entrance.coordinates, facility.coordinates) <= 200
+    );
+
+    nearbyEntrances.forEach((entrance) => assigned.add(entrance.id));
+
+    const nearestEntrance = nearbyEntrances
+      .slice()
+      .sort(
+        (a, b) =>
+          distanceMeters(a.coordinates, origin) -
+          distanceMeters(b.coordinates, origin)
+      )[0];
+
+    const accessSource =
+      facility.accessStatus !== "unknown"
+        ? facility
+        : nearbyEntrances.find(
+            (entrance) =>
+              entrance.accessStatus !== "unknown"
+          ) ?? facility;
+
+    return {
+      id: facility.id,
+      name: facility.name,
+      address: facility.address,
+      // Navigate to the entrance closest to the destination rather than a polygon centroid.
+      coordinates: nearestEntrance?.coordinates ?? facility.coordinates,
+      osmType: facility.osmType,
+      osmId: facility.osmId,
+      entranceCount: nearbyEntrances.length || undefined,
+      accessStatus: accessSource.accessStatus,
+      accessLabel: accessSource.accessLabel,
+    };
+  });
+
+  // Entrances with no mapped facility are spatially clustered so a garage with several
+  // entrance nodes still appears as one parking choice.
+  const remaining = entrances
+    .filter((entrance) => !assigned.has(entrance.id))
+    .sort(
+      (a, b) => distanceMeters(a.coordinates, origin) - distanceMeters(b.coordinates, origin)
+    );
+
+  while (remaining.length) {
+    const seed = remaining.shift()!;
+    const cluster = [seed];
+    for (let i = remaining.length - 1; i >= 0; i -= 1) {
+      if (distanceMeters(seed.coordinates, remaining[i].coordinates) <= 150) {
+        cluster.push(remaining[i]);
+        remaining.splice(i, 1);
+      }
+    }
+
+    const nearest = cluster
+      .slice()
+      .sort(
+        (a, b) =>
+          distanceMeters(a.coordinates, origin) -
+          distanceMeters(b.coordinates, origin)
+      )[0];
+    const named = cluster.find((item) => item.name !== "Parking Entrance");
+
+    const accessSource =
+      cluster.find(
+        (item) =>
+          item.accessStatus !== "unknown"
+      ) ?? nearest;
+
+    grouped.push({
+      id: `osm-parking-cluster-${nearest.osmType ?? "x"}-${nearest.osmId ?? nearest.id}`,
+      name: named?.name.replace(/ Parking Entrance$/, " Parking") ?? "Parking Garage",
+      address: named?.address ?? nearest.address,
+      coordinates: nearest.coordinates,
+      osmType: nearest.osmType,
+      osmId: nearest.osmId,
+      entranceCount: cluster.length,
+      accessStatus: accessSource.accessStatus,
+      accessLabel: accessSource.accessLabel,
+    });
+  }
+
+  return grouped.sort(
+    (a, b) => distanceMeters(a.coordinates, origin) - distanceMeters(b.coordinates, origin)
+  );
+};
+
 const fetchOverpassParking =
   async (
     origin: {
@@ -315,7 +526,7 @@ out tags center;
         ? payload.elements
         : [];
 
-    return elements
+    const discovered = elements
       .map((element) => {
         const tags =
           element.tags ?? {};
@@ -342,6 +553,11 @@ out tags center;
             tags
           );
 
+        const access =
+          classifyParkingAccess(
+            tags
+          );
+
         return {
           id: `osm-parking-${element.type}-${element.id}`,
           name:
@@ -355,14 +571,23 @@ out tags center;
             element.type,
           osmId:
             element.id,
-        } satisfies OttawaDiscoveredParking;
+          ...access,
+          discoveryType:
+            tags.amenity === "parking_entrance"
+              ? "entrance"
+              : tags.site === "parking" && tags.amenity !== "parking"
+                ? "site"
+                : "facility",
+        } satisfies InternalDiscoveredParking;
       })
       .filter(
         (
           item
-        ): item is OttawaDiscoveredParking =>
+        ): item is InternalDiscoveredParking =>
           item !== null
       );
+
+    return groupParkingFacilities(discovered, origin);
   };
 
 const buildPhotonAddress = (
@@ -567,6 +792,8 @@ const fetchPhotonFallback =
           },
           osmType,
           osmId,
+          accessStatus: "unknown",
+          accessLabel: "Access not verified",
         } satisfies OttawaDiscoveredParking;
       })
       .filter(
@@ -602,7 +829,7 @@ export const discoverOttawaDestinationParking =
       origin.lng.toFixed(4),
       radiusKm.toFixed(1),
       limit,
-      "overpass-v2-entrances",
+      "overpass-v4-access",
     ].join(":");
 
     const cached =
