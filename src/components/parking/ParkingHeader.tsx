@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { calculateDistance } from "@/utils/distance";
 import { searchOttawaDestinations, type OttawaDestinationResult } from "@/services/ottawaDestinationSearch";
 import { discoverOttawaDestinationParking } from "@/services/ottawaDestinationParking";
+import { getParkSenseTopChoices } from "@/services/parkSenseEngine";
 
 export type NearbyParkingKind =
   | "lot"
@@ -103,6 +104,13 @@ export const ParkingHeader = ({
 
   const [nearbyContext, setNearbyContext] =
     useState<NearbyContext>({ kind: "user" });
+
+  const [
+    parkSenseIntent,
+    setParkSenseIntent,
+  ] = useState<
+    "best" | "fastest" | "cheapest"
+  >("best");
 
   const [
     destinationQuery,
@@ -556,6 +564,31 @@ export const ParkingHeader = ({
     }
   };
 
+  const parkSenseChoices =
+    nearbyContext.kind === "destination" &&
+    nearbyResults.length > 0
+      ? getParkSenseTopChoices(
+          nearbyResults,
+          {}
+        )
+      : null;
+
+  const parkSenseChoice =
+    parkSenseChoices
+      ? parkSenseIntent === "fastest"
+        ? parkSenseChoices.fastest
+        : parkSenseIntent === "cheapest"
+        ? parkSenseChoices.cheapest
+        : parkSenseChoices.best
+      : null;
+
+  const parkSenseIntentLabel =
+    parkSenseIntent === "fastest"
+      ? "Fastest"
+      : parkSenseIntent === "cheapest"
+      ? "Cheapest"
+      : "Best Choice";
+
   const isDark = theme === "dark";
 
   return (
@@ -822,6 +855,123 @@ export const ParkingHeader = ({
                   </Button>
                 </div>
 
+                {parkSenseChoice && (
+                  <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 shadow-sm dark:border-emerald-900/70 dark:bg-emerald-950/30">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="text-xs font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                        ParkSense™
+                      </div>
+
+                      <div className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                        {parkSenseChoice.parkSenseScore}
+                      </div>
+                    </div>
+
+                    <div className="mb-2 grid grid-cols-3 gap-1 rounded-lg bg-background/70 p-1">
+                      {(
+                        [
+                          ["best", "Best"],
+                          [
+                            "fastest",
+                            "Fastest",
+                          ],
+                          [
+                            "cheapest",
+                            "Cheapest",
+                          ],
+                        ] as const
+                      ).map(
+                        ([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() =>
+                              setParkSenseIntent(
+                                value
+                              )
+                            }
+                            className={`rounded-md px-2 py-1.5 text-[11px] font-bold transition-colors ${
+                              parkSenseIntent ===
+                              value
+                                ? "bg-emerald-600 text-white"
+                                : "text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        )
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onFindNearby([
+                          parkSenseChoice,
+                        ])
+                      }
+                      className="w-full rounded-lg text-left transition-opacity hover:opacity-80"
+                    >
+                      <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                        {parkSenseIntentLabel}
+                      </div>
+
+                      <div className="truncate text-sm font-bold">
+                        {parkSenseChoice.name}
+                      </div>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <span>
+                          {formatDistance(
+                            parkSenseChoice.distanceKm
+                          )}
+                        </span>
+
+                        {parkSenseChoice.accessLabel && (
+                          <>
+                            <span>·</span>
+                            <span>
+                              {
+                                parkSenseChoice.accessLabel
+                              }
+                            </span>
+                          </>
+                        )}
+
+                        {parkSenseChoice.rateLabel && (
+                          <>
+                            <span>·</span>
+                            <span>
+                              {
+                                parkSenseChoice.rateLabel
+                              }
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {parkSenseChoice.reasons.length >
+                        0 && (
+                        <div className="mt-2 text-xs text-emerald-800 dark:text-emerald-300">
+                          Why:{" "}
+                          {
+                            parkSenseChoice
+                              .reasons[0]
+                          }
+                        </div>
+                      )}
+
+                      {parkSenseChoice.warning && (
+                        <div className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                          {
+                            parkSenseChoice.warning
+                          }
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   {nearbyResults.map(
                     (result, index) => {
@@ -995,6 +1145,144 @@ export const ParkingHeader = ({
                             </div>
 
                             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(14px+env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
+                              {parkSenseChoice && (
+                                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-3 shadow-sm dark:border-emerald-900/70 dark:bg-emerald-950/30">
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <div className="text-[11px] font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                                      ParkSense™
+                                    </div>
+
+                                    <div className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">
+                                      {
+                                        parkSenseChoice.parkSenseScore
+                                      }
+                                    </div>
+                                  </div>
+
+                                  <div className="mb-2 grid grid-cols-3 gap-1 rounded-lg bg-background/70 p-1">
+                                    {(
+                                      [
+                                        [
+                                          "best",
+                                          "Best",
+                                        ],
+                                        [
+                                          "fastest",
+                                          "Fastest",
+                                        ],
+                                        [
+                                          "cheapest",
+                                          "Cheapest",
+                                        ],
+                                      ] as const
+                                    ).map(
+                                      ([
+                                        value,
+                                        label,
+                                      ]) => (
+                                        <button
+                                          key={
+                                            value
+                                          }
+                                          type="button"
+                                          onClick={() =>
+                                            setParkSenseIntent(
+                                              value
+                                            )
+                                          }
+                                          className={`rounded-md px-1.5 py-1.5 text-[10px] font-bold transition-colors ${
+                                            parkSenseIntent ===
+                                            value
+                                              ? "bg-emerald-600 text-white"
+                                              : "text-muted-foreground"
+                                          }`}
+                                        >
+                                          {label}
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onFindNearby([
+                                        parkSenseChoice,
+                                      ]);
+                                      setNearbyMobileCollapsed(
+                                        true
+                                      );
+                                    }}
+                                    className="w-full text-left"
+                                  >
+                                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                                      {
+                                        parkSenseIntentLabel
+                                      }
+                                    </div>
+
+                                    <div className="truncate text-sm font-bold">
+                                      {
+                                        parkSenseChoice.name
+                                      }
+                                    </div>
+
+                                    <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                                      <span>
+                                        {formatDistance(
+                                          parkSenseChoice.distanceKm
+                                        )}
+                                      </span>
+
+                                      {parkSenseChoice.accessLabel && (
+                                        <>
+                                          <span>
+                                            ·
+                                          </span>
+                                          <span>
+                                            {
+                                              parkSenseChoice.accessLabel
+                                            }
+                                          </span>
+                                        </>
+                                      )}
+
+                                      {parkSenseChoice.rateLabel && (
+                                        <>
+                                          <span>
+                                            ·
+                                          </span>
+                                          <span>
+                                            {
+                                              parkSenseChoice.rateLabel
+                                            }
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {parkSenseChoice.reasons.length >
+                                      0 && (
+                                      <div className="mt-2 text-xs text-emerald-800 dark:text-emerald-300">
+                                        Why:{" "}
+                                        {
+                                          parkSenseChoice
+                                            .reasons[0]
+                                        }
+                                      </div>
+                                    )}
+
+                                    {parkSenseChoice.warning && (
+                                      <div className="mt-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                                        {
+                                          parkSenseChoice.warning
+                                        }
+                                      </div>
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+
                               {nearbyResults.map(
                                 (
                                   result,

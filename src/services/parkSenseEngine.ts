@@ -94,6 +94,20 @@ const getAvailabilityScore = (
   return 50;
 };
 
+const hasKnownPrice = (
+  item: NearbyParkingResult
+): boolean => {
+  if (item.kind === "15min") {
+    return true;
+  }
+
+  return (
+    parseHourlyRate(
+      item.rateLabel
+    ) !== null
+  );
+};
+
 const getPriceScore = (
   item: NearbyParkingResult
 ): number => {
@@ -117,6 +131,83 @@ const getPriceScore = (
   );
 };
 
+const getAccessSuitabilityScore = (
+  item: NearbyParkingResult
+): {
+  score: number;
+  warning: string | null;
+} => {
+  /*
+   * Known public/customer access should outrank an otherwise equal
+   * parking option whose access is not verified.
+   *
+   * Private/no-access parking is already filtered out upstream.
+   */
+  if (item.kind === "paid") {
+    return {
+      score: 96,
+      warning: null,
+    };
+  }
+
+  if (item.kind === "15min") {
+    return {
+      score: 96,
+      warning: null,
+    };
+  }
+
+  if (item.isCityOfficial) {
+    return {
+      score: 96,
+      warning: null,
+    };
+  }
+
+  switch (item.accessStatus) {
+    case "public":
+      return {
+        score: 100,
+        warning: null,
+      };
+
+    case "customers":
+      return {
+        score: 94,
+        warning: null,
+      };
+
+    case "permit":
+      return {
+        score: 35,
+        warning:
+          "Permit may be required for this parking option.",
+      };
+
+    case "residents":
+      return {
+        score: 25,
+        warning:
+          "This parking may be restricted to residents.",
+      };
+
+    case "restricted":
+      return {
+        score: 25,
+        warning:
+          "This parking has restricted access.",
+      };
+
+    case "unknown":
+    default:
+      return {
+        score: 62,
+        warning:
+          "Parking access has not been verified.",
+      };
+  }
+};
+
 const getSuitability = (
   item: NearbyParkingResult,
   stayMinutes?: number | null
@@ -124,11 +215,11 @@ const getSuitability = (
   score: number;
   warning: string | null;
 } => {
+  const access =
+    getAccessSuitabilityScore(item);
+
   if (item.kind !== "15min") {
-    return {
-      score: 90,
-      warning: null,
-    };
+    return access;
   }
 
   if (
@@ -137,8 +228,12 @@ const getSuitability = (
   ) {
     if (stayMinutes <= 15) {
       return {
-        score: 100,
-        warning: null,
+        score: Math.min(
+          100,
+          access.score
+        ),
+        warning:
+          access.warning,
       };
     }
 
@@ -150,7 +245,10 @@ const getSuitability = (
   }
 
   return {
-    score: 45,
+    score: Math.min(
+      45,
+      access.score
+    ),
     warning:
       "15-minute parking is only suitable for short stops.",
   };
@@ -382,7 +480,11 @@ const scoreOne = (
         metrics
       ),
     warning:
-      suitabilityResult.warning,
+      intent === "cheapest" &&
+      !hasKnownPrice(item)
+        ? suitabilityResult.warning ??
+          "Price is not available for this parking option."
+        : suitabilityResult.warning,
   };
 };
 
@@ -400,6 +502,26 @@ export const rankParkSense = (
       )
     )
     .sort((a, b) => {
+      /*
+       * Cheapest must not claim an unknown-price option is cheaper
+       * than an option with a verified price.
+       *
+       * If at least one candidate has known pricing, rank all known-price
+       * candidates ahead of unknown-price candidates. If none have known
+       * pricing, normal scoring still provides a best-effort result and the
+       * UI warning explains that price is unavailable.
+       */
+      if (intent === "cheapest") {
+        const aKnown =
+          hasKnownPrice(a);
+        const bKnown =
+          hasKnownPrice(b);
+
+        if (aKnown !== bKnown) {
+          return aKnown ? -1 : 1;
+        }
+      }
+
       const scoreDiff =
         b.parkSenseScore -
         a.parkSenseScore;
