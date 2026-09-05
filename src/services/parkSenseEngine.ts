@@ -171,11 +171,34 @@ const getAccessSuitabilityScore = (
         warning: null,
       };
 
-    case "customers":
+    case "customers": {
+      /*
+       * Destination-aware customer parking:
+       * - matched: OSM identity evidence links the parking to the selected destination
+       * - different: OSM identity evidence points to another business/facility
+       * - unverified: we know it is customers-only, but cannot prove whose customers
+       */
+      if (item.destinationAssociation === "matched") {
+        return {
+          score: 100,
+          warning: null,
+        };
+      }
+
+      if (item.destinationAssociation === "different") {
+        return {
+          score: 15,
+          warning:
+            "Customers-only parking appears to belong to another destination.",
+        };
+      }
+
       return {
-        score: 94,
-        warning: null,
+        score: 78,
+        warning:
+          "Customers-only parking is not verified for this destination.",
       };
+    }
 
     case "permit":
       return {
@@ -313,6 +336,13 @@ const getReasons = (
     reasons.push("Very close to your destination");
   } else if (item.distanceKm <= 0.5) {
     reasons.push("Short walk from your destination");
+  }
+
+  if (
+    item.accessStatus === "customers" &&
+    item.destinationAssociation === "matched"
+  ) {
+    reasons.push("Customer parking matches your destination");
   }
 
   if (

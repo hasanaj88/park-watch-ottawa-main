@@ -19,6 +19,15 @@ export type OttawaDiscoveredParking = {
     | "restricted"
     | "unknown";
   accessLabel: string;
+  // OSM identity hints only. Empty means association is not verified.
+  destinationAssociationHints?: string[];
+
+  // Nearby named OSM places/sites around this parking facility.
+  // Used as contextual evidence only; direct parking identity above remains stronger.
+  nearbyDestinationHints?: Array<{
+    name: string;
+    distanceMeters: number;
+  }>;
 };
 
 type OverpassElement = {
@@ -89,6 +98,42 @@ const asText = (
 const normalizeAccess = (
   value: string | undefined
 ) => value?.trim().toLowerCase() ?? null;
+
+const buildDestinationAssociationHints = (
+  tags: Record<string, string>
+): string[] =>
+  Array.from(
+    new Set(
+      [
+        tags.name,
+        tags.operator,
+        tags.brand,
+        tags["operator:wikidata"],
+        tags["brand:wikidata"],
+      ]
+        .map(asText)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+const isDestinationContextFeature = (
+  tags: Record<string, string>
+): boolean => {
+  if (!asText(tags.name)) {
+    return false;
+  }
+
+  return Boolean(
+    tags.amenity ||
+      tags.shop ||
+      tags.tourism ||
+      tags.office ||
+      tags.leisure ||
+      tags["healthcare"] ||
+      tags.landuse === "retail"
+  );
+};
+
 
 
 const classifyParkingAccess = (
@@ -408,6 +453,14 @@ const groupParkingFacilities = (
       entranceCount: nearbyEntrances.length || undefined,
       accessStatus: accessSource.accessStatus,
       accessLabel: accessSource.accessLabel,
+      destinationAssociationHints: Array.from(
+        new Set([
+          ...(facility.destinationAssociationHints ?? []),
+          ...nearbyEntrances.flatMap(
+            (entrance) => entrance.destinationAssociationHints ?? []
+          ),
+        ])
+      ),
     };
   });
 
@@ -454,6 +507,13 @@ const groupParkingFacilities = (
       entranceCount: cluster.length,
       accessStatus: accessSource.accessStatus,
       accessLabel: accessSource.accessLabel,
+      destinationAssociationHints: Array.from(
+        new Set(
+          cluster.flatMap(
+            (item) => item.destinationAssociationHints ?? []
+          )
+        )
+      ),
     });
   }
 
@@ -493,6 +553,15 @@ const fetchOverpassParking =
   nwr["amenity"="parking"](around:${radiusMeters},${origin.lat},${origin.lng});
   nwr["amenity"="parking_entrance"](around:${radiusMeters},${origin.lat},${origin.lng});
   nwr["site"="parking"](around:${radiusMeters},${origin.lat},${origin.lng});
+
+  // Destination context used only for conservative site-aware matching.
+  nwr["name"]["amenity"](around:300,${origin.lat},${origin.lng});
+  nwr["name"]["shop"](around:300,${origin.lat},${origin.lng});
+  nwr["name"]["tourism"](around:300,${origin.lat},${origin.lng});
+  nwr["name"]["office"](around:300,${origin.lat},${origin.lng});
+  nwr["name"]["leisure"](around:300,${origin.lat},${origin.lng});
+  nwr["name"]["healthcare"](around:300,${origin.lat},${origin.lng});
+  nwr["name"]["landuse"="retail"](around:300,${origin.lat},${origin.lng});
 );
 out tags center;
 `.trim();
@@ -525,6 +594,43 @@ out tags center;
       Array.isArray(payload.elements)
         ? payload.elements
         : [];
+
+    const destinationContext = elements
+      .map((element) => {
+        const tags = element.tags ?? {};
+
+        if (
+          isUsableCarParking(tags) ||
+          !isDestinationContextFeature(tags)
+        ) {
+          return null;
+        }
+
+        const coordinates =
+          getOverpassPoint(element);
+
+        const name = asText(tags.name);
+
+        if (!coordinates || !name) {
+          return null;
+        }
+
+        return {
+          name,
+          coordinates,
+        };
+      })
+      .filter(
+        (
+          item
+        ): item is {
+          name: string;
+          coordinates: {
+            lat: number;
+            lng: number;
+          };
+        } => item !== null
+      );
 
     const discovered = elements
       .map((element) => {
@@ -572,6 +678,8 @@ out tags center;
           osmId:
             element.id,
           ...access,
+          destinationAssociationHints:
+            buildDestinationAssociationHints(tags),
           discoveryType:
             tags.amenity === "parking_entrance"
               ? "entrance"
@@ -587,7 +695,41 @@ out tags center;
           item !== null
       );
 
-    return groupParkingFacilities(discovered, origin);
+    const grouped =
+      groupParkingFacilities(
+        discovered,
+        origin
+      );
+
+    return grouped.map((parking) => ({
+      ...parking,
+      nearbyDestinationHints: destinationContext
+        .map((place) => ({
+          name: place.name,
+          distanceMeters: Math.round(
+            distanceMeters(
+              parking.coordinates,
+              place.coordinates
+            )
+          ),
+        }))
+        .filter(
+          (place) =>
+            place.distanceMeters <= 180
+        )
+        .sort(
+          (a, b) =>
+            a.distanceMeters -
+            b.distanceMeters
+        )
+        .filter(
+          (place, index, items) =>
+            items.findIndex(
+              (candidate) =>
+                candidate.name === place.name
+            ) === index
+        ),
+    }));
   };
 
 const buildPhotonAddress = (
@@ -794,6 +936,8 @@ const fetchPhotonFallback =
           osmId,
           accessStatus: "unknown",
           accessLabel: "Access not verified",
+          destinationAssociationHints: [],
+          nearbyDestinationHints: [],
         } satisfies OttawaDiscoveredParking;
       })
       .filter(
@@ -829,7 +973,7 @@ export const discoverOttawaDestinationParking =
       origin.lng.toFixed(4),
       radiusKm.toFixed(1),
       limit,
-      "overpass-v4-access",
+      "overpass-v7-distance-aware",
     ].join(":");
 
     const cached =

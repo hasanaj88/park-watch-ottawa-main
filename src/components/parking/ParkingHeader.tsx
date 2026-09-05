@@ -39,6 +39,15 @@ export type NearbyParkingItem = {
     | "restricted"
     | "unknown";
   accessLabel?: string | null;
+  destinationAssociationHints?: string[];
+  nearbyDestinationHints?: Array<{
+    name: string;
+    distanceMeters: number;
+  }>;
+  destinationAssociation?:
+    | "matched"
+    | "different"
+    | "unverified";
 };
 
 export type NearbyParkingResult =
@@ -167,6 +176,101 @@ export const ParkingHeader = ({
       : kind === "paid"
       ? "Paid Street"
       : "Parking Lot";
+
+  const normalizeDestinationIdentity = (
+    value: string
+  ) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+  const classifyDestinationAssociation = (
+    destination: OttawaDestinationResult,
+    parking: {
+      accessStatus?: NearbyParkingItem["accessStatus"];
+      destinationAssociationHints?: string[];
+      nearbyDestinationHints?: string[];
+    }
+  ): NearbyParkingItem["destinationAssociation"] => {
+    if (parking.accessStatus !== "customers") {
+      return "unverified";
+    }
+
+    const destinationLabel =
+      normalizeDestinationIdentity(
+        destination.label
+      );
+
+    const destinationIdentity =
+      normalizeDestinationIdentity(
+        `${destination.label} ${destination.address}`
+      );
+
+    const matchesDestination = (
+      hint: string
+    ) => {
+      const normalizedHint =
+        normalizeDestinationIdentity(hint);
+
+      if (normalizedHint.length < 3) {
+        return false;
+      }
+
+      return (
+        destinationIdentity.includes(
+          normalizedHint
+        ) ||
+        normalizedHint.includes(
+          destinationLabel
+        ) ||
+        destinationLabel.includes(
+          normalizedHint
+        )
+      );
+    };
+
+    const directHints =
+      parking.destinationAssociationHints ?? [];
+
+    if (
+      directHints.some(
+        matchesDestination
+      )
+    ) {
+      return "matched";
+    }
+
+    const nearbyHints =
+      parking.nearbyDestinationHints ?? [];
+
+    /*
+     * Contextual name matching is weaker than direct parking identity.
+     * Require the matching destination feature to be very close to the
+     * parking facility so a restaurant elsewhere on the same block does
+     * not accidentally claim a customers-only lot.
+     */
+    if (
+      nearbyHints.some(
+        (hint) =>
+          hint.distanceMeters <= 50 &&
+          matchesDestination(hint.name)
+      )
+    ) {
+      return "matched";
+    }
+
+    /*
+     * Only direct parking identity can prove "different".
+     * Nearby businesses are contextual and may simply share the same block,
+     * so absence of a match there remains unverified rather than penalized.
+     */
+    if (directHints.length > 0) {
+      return "different";
+    }
+
+    return "unverified";
+  };
 
   const rankNearbyItems = (
     origin: { lat: number; lng: number },
@@ -502,6 +606,15 @@ export const ParkingHeader = ({
               parking.accessStatus,
             accessLabel:
               parking.accessLabel,
+            destinationAssociationHints:
+              parking.destinationAssociationHints ?? [],
+            nearbyDestinationHints:
+              parking.nearbyDestinationHints ?? [],
+            destinationAssociation:
+              classifyDestinationAssociation(
+                destination,
+                parking
+              ),
             isLive: false,
             isCityOfficial: false,
             freeSpaces: null,
