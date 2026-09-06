@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, RefreshCw, MapPin, X, Search, Loader2 } from "lucide-react";
+import { Moon, Sun, RefreshCw, MapPin, X, Search, Loader2, Navigation } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -739,6 +739,38 @@ export const ParkingHeader = ({
       ? "Cheapest"
       : "Best Choice";
 
+  const handleParkSenseNavigate = () => {
+    if (!parkSenseChoice) return;
+
+    const { lat, lng } =
+      parkSenseChoice.coordinates;
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lng)
+    ) {
+      toast({
+        title: "Navigation Unavailable",
+        description:
+          "This parking option does not have valid map coordinates.",
+        variant: "destructive",
+        duration: 3000,
+      });
+      return;
+    }
+
+    const url =
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+        `${lat},${lng}`
+      )}`;
+
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
   const isDark = theme === "dark";
 
   return (
@@ -1104,10 +1136,9 @@ export const ParkingHeader = ({
                         0 && (
                         <div className="mt-2 text-xs text-emerald-800 dark:text-emerald-300">
                           Why:{" "}
-                          {
-                            parkSenseChoice
-                              .reasons[0]
-                          }
+                          {parkSenseChoice.reasons
+                            .slice(0, 2)
+                            .join(" · ")}
                         </div>
                       )}
 
@@ -1119,6 +1150,15 @@ export const ParkingHeader = ({
                         </div>
                       )}
                     </button>
+
+                     <button
+                       type="button"
+                       onClick={handleParkSenseNavigate}
+                       className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700"
+                     >
+                       <Navigation className="h-4 w-4" />
+                       Navigate
+                     </button>
                   </div>
                 )}
 
@@ -1415,10 +1455,9 @@ export const ParkingHeader = ({
                                       0 && (
                                       <div className="mt-2 text-xs text-emerald-800 dark:text-emerald-300">
                                         Why:{" "}
-                                        {
-                                          parkSenseChoice
-                                            .reasons[0]
-                                        }
+                                        {parkSenseChoice.reasons
+                                          .slice(0, 2)
+                                          .join(" · ")}
                                       </div>
                                     )}
 
@@ -1430,6 +1469,15 @@ export const ParkingHeader = ({
                                       </div>
                                     )}
                                   </button>
+
+                                   <button
+                                     type="button"
+                                     onClick={handleParkSenseNavigate}
+                                     className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white active:bg-emerald-700"
+                                   >
+                                     <Navigation className="h-4 w-4" />
+                                     Navigate
+                                   </button>
                                 </div>
                               )}
 

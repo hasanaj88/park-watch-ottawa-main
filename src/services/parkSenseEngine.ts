@@ -342,11 +342,9 @@ const getReasons = (
 ): string[] => {
   const reasons: string[] = [];
 
-  if (item.distanceKm <= 0.2) {
-    reasons.push("Very close to your destination");
-  } else if (item.distanceKm <= 0.5) {
-    reasons.push("Short walk from your destination");
-  }
+  if (item.distanceKm <= 0.5) {
+  reasons.push("Convenient walking distance");
+}
 
   if (
     item.accessStatus === "customers" &&
@@ -390,7 +388,7 @@ const getReasons = (
     intent === "fastest" &&
     metrics.distance >= 80
   ) {
-    reasons.push("Prioritizes minimal walking");
+    reasons.push("Balances walking distance and parking suitability");
   }
 
   if (
@@ -398,6 +396,14 @@ const getReasons = (
     metrics.availability >= 65
   ) {
     reasons.push("Good availability signal");
+  }
+
+  if (
+    intent !== "cheapest" &&
+    metrics.parkPulse !== null &&
+    metrics.parkPulse >= 65
+  ) {
+    reasons.push("Lower parking pressure nearby");
   }
 
   return reasons.slice(0, 3);
