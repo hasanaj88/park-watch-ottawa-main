@@ -4,6 +4,8 @@ import type { NearbyParkingResult } from "@/components/parking/ParkingHeader";
 
 export type ParkSenseIntent = "best" | "fastest" | "cheapest";
 
+export type ParkSenseConfidenceLevel = "high" | "medium" | "limited";
+
 export type ParkSenseContext = {
   /**
    * Optional planned parking duration.
@@ -34,6 +36,8 @@ export type ParkSenseContext = {
 export type ParkSenseScoredResult = NearbyParkingResult & {
   parkSenseScore: number;
   intent: ParkSenseIntent;
+  confidenceScore: number;
+  confidenceLevel: ParkSenseConfidenceLevel;
 
   metrics: {
     distance: number;
@@ -335,6 +339,62 @@ const weightedAverage = (
   );
 };
 
+const getRecommendationConfidence = (
+  item: NearbyParkingResult,
+  candidateParkPulsePressure?: number | null
+): {
+  score: number;
+  level: ParkSenseConfidenceLevel;
+} => {
+  // Evidence quality only; does not affect ParkSense ranking.
+  let accessConfidence = 45;
+
+  if (item.kind === "paid" || item.kind === "15min" || item.isCityOfficial) {
+    accessConfidence = 100;
+  } else if (item.accessStatus === "public") {
+    accessConfidence = 100;
+  } else if (item.accessStatus === "customers") {
+    accessConfidence =
+      item.destinationAssociation === "matched"
+        ? 100
+        : item.destinationAssociation === "different"
+          ? 90
+          : 70;
+  } else if (
+    item.accessStatus === "permit" ||
+    item.accessStatus === "residents" ||
+    item.accessStatus === "restricted"
+  ) {
+    accessConfidence = 90;
+  }
+
+  const hasLiveAvailability =
+    item.isLive &&
+    typeof item.freeSpaces === "number" &&
+    typeof item.capacity === "number" &&
+    item.capacity > 0;
+
+  const availabilityConfidence = hasLiveAvailability ? 100 : 45;
+  const priceConfidence = hasKnownPrice(item) ? 100 : 45;
+  const parkPulseConfidence =
+    typeof candidateParkPulsePressure === "number" &&
+    Number.isFinite(candidateParkPulsePressure)
+      ? 100
+      : 45;
+
+  const score = roundScore(
+    accessConfidence * 0.35 +
+      availabilityConfidence * 0.30 +
+      priceConfidence * 0.20 +
+      parkPulseConfidence * 0.15
+  );
+
+  const level: ParkSenseConfidenceLevel =
+    score >= 80 ? "high" : score >= 60 ? "medium" : "limited";
+
+  return { score, level };
+};
+
 const getReasons = (
   item: NearbyParkingResult,
   intent: ParkSenseIntent,
@@ -439,6 +499,12 @@ const scoreOne = (
       candidateParkPulsePressure
     );
 
+  const confidence =
+    getRecommendationConfidence(
+      item,
+      candidateParkPulsePressure
+    );
+
   let score: number;
 
   if (intent === "fastest") {
@@ -523,6 +589,8 @@ const scoreOne = (
     parkSenseScore:
       roundScore(score),
     intent,
+    confidenceScore: confidence.score,
+    confidenceLevel: confidence.level,
     metrics,
     reasons:
       getReasons(

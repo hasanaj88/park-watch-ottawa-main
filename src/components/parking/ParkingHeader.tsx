@@ -739,6 +739,13 @@ export const ParkingHeader = ({
       ? "Cheapest"
       : "Best Choice";
 
+  const parkSenseConfidenceLabel =
+    parkSenseChoice?.confidenceLevel === "high"
+      ? "High"
+      : parkSenseChoice?.confidenceLevel === "medium"
+      ? "Medium"
+      : "Limited";
+
   const handleParkSenseNavigate = () => {
     if (!parkSenseChoice) return;
 
@@ -1132,7 +1139,14 @@ export const ParkingHeader = ({
                         )}
                       </div>
 
-                      {parkSenseChoice.reasons.length >
+                      <div className="mt-2 text-[11px] font-medium text-muted-foreground">
+                           Confidence:{" "}
+                           <span className="font-semibold text-foreground">
+                             {parkSenseConfidenceLabel}
+                           </span>
+                         </div>
+
+                         {parkSenseChoice.reasons.length >
                         0 && (
                         <div className="mt-2 text-xs text-emerald-800 dark:text-emerald-300">
                           Why:{" "}
@@ -1451,7 +1465,14 @@ export const ParkingHeader = ({
                                       )}
                                     </div>
 
-                                    {parkSenseChoice.reasons.length >
+                                    <div className="mt-2 text-[11px] font-medium text-muted-foreground">
+                           Confidence:{" "}
+                           <span className="font-semibold text-foreground">
+                             {parkSenseConfidenceLabel}
+                           </span>
+                         </div>
+
+                         {parkSenseChoice.reasons.length >
                                       0 && (
                                       <div className="mt-2 text-xs text-emerald-800 dark:text-emerald-300">
                                         Why:{" "}
