@@ -607,6 +607,121 @@ function calculateNearbyTrafficPressure(
   };
 }
 
+export type ParkPulseLocationScore = {
+  score: number;
+  level: ParkPulseZoneScore["level"];
+  confidence: ParkPulseConfidence;
+
+  liveLotsUsed: number;
+  livePressure: number | null;
+  timePressure: number;
+
+  trafficPressure: number | null;
+  nearbyTrafficEvents: number;
+  highPriorityTrafficEvents: number;
+
+  updatedAt: string;
+};
+
+/*
+ * Calculate ParkPulse pressure at an exact location.
+ *
+ * This intentionally uses the same V2 pressure model as the
+ * neighbourhood layer:
+ * - 60% nearby live parking occupancy
+ * - 20% temporal demand model
+ * - 20% nearby traffic/event pressure
+ *
+ * Missing signals are removed and the remaining weights are
+ * renormalized, so unavailable traffic/live data is never
+ * interpreted as zero pressure.
+ */
+export function calculateParkPulseAtLocation({
+  location,
+  lots,
+  trafficEvents = [],
+  now = new Date(),
+  liveInfluenceRadiusKm = 2.5,
+  trafficInfluenceRadiusKm = 2.0,
+}: {
+  location: LatLng;
+  lots: ParkingLot[];
+  trafficEvents?: OttawaTrafficEventFeature[];
+  now?: Date;
+  liveInfluenceRadiusKm?: number;
+  trafficInfluenceRadiusKm?: number;
+}): ParkPulseLocationScore {
+  const timePressure = getTimePressure(now);
+
+  const live = calculateNearbyLivePressure(
+    location,
+    lots,
+    liveInfluenceRadiusKm
+  );
+
+  const traffic = calculateNearbyTrafficPressure(
+    location,
+    trafficEvents,
+    trafficInfluenceRadiusKm
+  );
+
+  let weightedScore = 0;
+  let totalScoreWeight = 0;
+
+  if (live.pressure !== null) {
+    weightedScore += live.pressure * 0.6;
+    totalScoreWeight += 0.6;
+  }
+
+  weightedScore += timePressure * 0.2;
+  totalScoreWeight += 0.2;
+
+  if (traffic.pressure !== null) {
+    weightedScore += traffic.pressure * 0.2;
+    totalScoreWeight += 0.2;
+  }
+
+  const score = clamp(
+    Math.round(weightedScore / totalScoreWeight),
+    0,
+    100
+  );
+
+  const confidence: ParkPulseConfidence =
+    live.liveLotsUsed >= 2
+      ? "live"
+      : live.liveLotsUsed === 1
+      ? "estimated"
+      : "limited";
+
+  return {
+    score,
+    level: getLevel(score),
+    confidence,
+
+    liveLotsUsed: live.liveLotsUsed,
+    livePressure:
+      live.pressure === null
+        ? null
+        : Math.round(live.pressure),
+
+    timePressure,
+
+    trafficPressure:
+      traffic.pressure === null
+        ? null
+        : Math.round(traffic.pressure),
+
+    nearbyTrafficEvents:
+      traffic.nearbyTrafficEvents,
+
+    highPriorityTrafficEvents:
+      traffic.highPriorityTrafficEvents,
+
+    updatedAt: now.toISOString(),
+  };
+}
+
 export function calculateParkPulseScores({
   neighbourhoods,
   lots,

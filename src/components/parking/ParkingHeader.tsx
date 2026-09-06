@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Moon, Sun, RefreshCw, MapPin, X, Search, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/hooks/use-toast";
 import { calculateDistance } from "@/utils/distance";
@@ -66,6 +66,10 @@ interface ParkingHeaderProps {
     nearbyItems: NearbyParkingResult[]
   ) => void;
   nearbyItems: NearbyParkingItem[];
+  getParkPulseScoreForLocation?: (location: {
+    lat: number;
+    lng: number;
+  }) => number | null;
   onUserLocation?: (location: {
     lat: number;
     lng: number;
@@ -83,6 +87,7 @@ export const ParkingHeader = ({
   isLoading,
   onFindNearby,
   nearbyItems,
+  getParkPulseScoreForLocation,
   onUserLocation,
   onDestinationSelect,
   onDestinationParkingDiscovered,
@@ -677,12 +682,44 @@ export const ParkingHeader = ({
     }
   };
 
+  const parkPulseScores =
+    useMemo(() => {
+      if (
+        nearbyContext.kind !==
+          "destination" ||
+        !getParkPulseScoreForLocation ||
+        nearbyResults.length === 0
+      ) {
+        return {};
+      }
+
+      const scores: Record<
+        string,
+        number | null
+      > = {};
+
+      for (const item of nearbyResults) {
+        scores[item.id] =
+          getParkPulseScoreForLocation(
+            item.coordinates
+          );
+      }
+
+      return scores;
+    }, [
+      nearbyContext.kind,
+      nearbyResults,
+      getParkPulseScoreForLocation,
+    ]);
+
   const parkSenseChoices =
     nearbyContext.kind === "destination" &&
     nearbyResults.length > 0
       ? getParkSenseTopChoices(
           nearbyResults,
-          {}
+          {
+            parkPulseScores,
+          }
         )
       : null;
 

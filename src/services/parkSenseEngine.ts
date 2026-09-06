@@ -15,10 +15,20 @@ export type ParkSenseContext = {
   /**
    * Optional ParkPulse pressure for the destination area (0-100).
    * Lower pressure = easier parking conditions.
-   * V1 is designed so this signal can be connected later without
-   * changing the ranking API.
+   *
+   * Kept as a fallback for backwards compatibility.
    */
   parkPulseScore?: number | null;
+
+  /**
+   * Optional candidate-specific ParkPulse pressure keyed by parking item id.
+   * When present, this takes priority over parkPulseScore so each candidate
+   * can be evaluated using pressure at its own coordinates.
+   */
+  parkPulseScores?: Record<
+    string,
+    number | null | undefined
+  >;
 };
 
 export type ParkSenseScoredResult = NearbyParkingResult & {
@@ -413,9 +423,14 @@ const scoreOne = (
       context.stayMinutes
     );
 
+  const candidateParkPulsePressure =
+    context.parkPulseScores?.[
+      String(item.id)
+    ] ?? context.parkPulseScore;
+
   const parkPulse =
     getParkPulseScore(
-      context.parkPulseScore
+      candidateParkPulsePressure
     );
 
   let score: number;

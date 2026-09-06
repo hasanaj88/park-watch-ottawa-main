@@ -22,6 +22,7 @@ import { ParkingList } from "@/components/parking/ParkingList";
 import { useToast } from "@/hooks/use-toast";
 import AIChat from "@/components/AIChat";
 import type { ParkingLot } from "@/types/parking";
+import { calculateParkPulseAtLocation } from "@/services/parkPulseEngine";
 
 const normalizeAddress = (
   value: unknown
@@ -1028,6 +1029,17 @@ const Index = () => {
           }
           nearbyItems={
             nearbyParkingItems
+          }
+          getParkPulseScoreForLocation={(
+            location
+          ) =>
+            calculateParkPulseAtLocation({
+              location,
+              lots:
+                displayLots as ParkingLot[],
+              trafficEvents:
+                activeTrafficEvents,
+            }).score
           }
           onDestinationSelect={
             handleDestinationSelect
