@@ -4,13 +4,11 @@ import { getLotCounts, hasLotCounts } from "@/utils/parking";
 
 type Weather = { temp: number; rain: boolean; snow: boolean };
 
-// Uses VITE_API_BASE_URL in production.
-// Uses localhost only in DEV.
-const isDev = import.meta.env.DEV === true;
-
-const API_BASE: string = isDev
-  ? "http://localhost:3001"
-  : (import.meta.env.VITE_API_BASE_URL ?? "").toString();
+// Weather API is optional.
+// If VITE_API_BASE_URL is not configured, use time-only fallback.
+const API_BASE: string = (
+  import.meta.env.VITE_API_BASE_URL ?? ""
+).toString();
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));

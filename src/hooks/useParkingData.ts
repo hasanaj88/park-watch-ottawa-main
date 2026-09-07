@@ -9,7 +9,7 @@ import {
   isPostalCode,
 } from "@/utils/distance";
 import { geocodeOttawa } from "@/utils/geocode";
-import { supabase } from "@/services/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { safeInt, safeNum, getLotCounts } from "@/utils/parking";
 
 /** ================================
