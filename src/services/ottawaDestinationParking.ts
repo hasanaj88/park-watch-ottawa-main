@@ -20,7 +20,7 @@ export type OttawaDiscoveredParking = {
     | "unknown";
   accessLabel: string;
   // OSM identity hints only. Empty means association is not verified.
-  destinationAssociationHints?: string[];
+  destinationAssociationHints: string[];
 
   // Nearby named OSM places/sites around this parking facility.
   // Used as contextual evidence only; direct parking identity above remains stronger.
@@ -632,68 +632,71 @@ out tags center;
         } => item !== null
       );
 
-    const discovered = elements
-      .map((element) => {
-        const tags =
-          element.tags ?? {};
-
-        if (
-          !isUsableCarParking(
-            tags
-          )
-        ) {
-          return null;
-        }
-
-        const coordinates =
-          getOverpassPoint(
+    const discovered: InternalDiscoveredParking[] =
+      elements
+        .map(
+          (
             element
-          );
+          ): InternalDiscoveredParking | null => {
+            const tags =
+              element.tags ?? {};
 
-        if (!coordinates) {
-          return null;
-        }
+            if (
+              !isUsableCarParking(
+                tags
+              )
+            ) {
+              return null;
+            }
 
-        const address =
-          buildAddressFromTags(
-            tags
-          );
+            const coordinates =
+              getOverpassPoint(
+                element
+              );
 
-        const access =
-          classifyParkingAccess(
-            tags
-          );
+            if (!coordinates) {
+              return null;
+            }
 
-        return {
-          id: `osm-parking-${element.type}-${element.id}`,
-          name:
-            buildOverpassName(
-              tags,
-              address
-            ),
-          address,
-          coordinates,
-          osmType:
-            element.type,
-          osmId:
-            element.id,
-          ...access,
-          destinationAssociationHints:
-            buildDestinationAssociationHints(tags),
-          discoveryType:
-            tags.amenity === "parking_entrance"
-              ? "entrance"
-              : tags.site === "parking" && tags.amenity !== "parking"
-                ? "site"
-                : "facility",
-        } satisfies InternalDiscoveredParking;
-      })
-      .filter(
-        (
-          item
-        ): item is InternalDiscoveredParking =>
-          item !== null
-      );
+            const address =
+              buildAddressFromTags(
+                tags
+              );
+
+            const access =
+              classifyParkingAccess(
+                tags
+              );
+
+            return {
+              id: `osm-parking-${element.type}-${element.id}`,
+              name:
+                buildOverpassName(
+                  tags,
+                  address
+                ),
+              address,
+              coordinates,
+              osmType: element.type,
+              osmId: element.id,
+              ...access,
+              destinationAssociationHints:
+                buildDestinationAssociationHints(tags),
+              discoveryType:
+                tags.amenity === "parking_entrance"
+                  ? "entrance"
+                  : tags.site === "parking" && tags.amenity !== "parking"
+                    ? "site"
+                    : "facility",
+            };
+          }
+        )
+        .filter(
+          (
+            item
+          ): item is InternalDiscoveredParking =>
+            item !== null
+        );
 
     const grouped =
       groupParkingFacilities(
@@ -940,12 +943,7 @@ const fetchPhotonFallback =
           nearbyDestinationHints: [],
         } satisfies OttawaDiscoveredParking;
       })
-      .filter(
-        (
-          item
-        ): item is OttawaDiscoveredParking =>
-          item !== null
-      );
+      .filter((item) => item !== null);
   };
 
 export const discoverOttawaDestinationParking =

@@ -195,7 +195,10 @@ export const ParkingHeader = ({
     parking: {
       accessStatus?: NearbyParkingItem["accessStatus"];
       destinationAssociationHints?: string[];
-      nearbyDestinationHints?: string[];
+      nearbyDestinationHints?: Array<{
+        name: string;
+        distanceMeters: number;
+      }>;
     }
   ): NearbyParkingItem["destinationAssociation"] => {
     if (parking.accessStatus !== "customers") {

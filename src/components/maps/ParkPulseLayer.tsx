@@ -3,7 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GeoJSON } from "react-leaflet";
 import type { Layer, PathOptions } from "leaflet";
-import type { Feature, Geometry } from "geojson";
+type Geometry = {
+  type: string;
+  coordinates?: unknown;
+  geometries?: Geometry[];
+};
+
+type Feature<G extends Geometry, P> = {
+  type: "Feature";
+  geometry: G;
+  properties: P;
+  id?: string | number;
+};
 
 import { useOttawaNeighbourhoods } from "@/hooks/useOttawaNeighbourhoods";
 import type { OttawaNeighbourhoodProperties } from "@/services/ottawaNeighbourhoods";
@@ -834,10 +845,12 @@ export default function ParkPulseLayer({
       </style>
 
       <GeoJSON
-      key={`parkpulse-engine-${renderSignature}`}
-      data={centralCollection as any}
-      style={style}
-      onEachFeature={onEachFeature}
+        key={`parkpulse-engine-${renderSignature}`}
+        {...({
+          data: centralCollection as any,
+          style,
+          onEachFeature,
+        } as any)}
       />
     </>
   );

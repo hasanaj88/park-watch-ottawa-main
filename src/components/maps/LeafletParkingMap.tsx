@@ -1191,15 +1191,17 @@ export default function LeafletParkingMap({
       )}
 
       <MapContainer
-        center={ottawa}
-        zoom={13}
+        {...({ center: ottawa } as { center: [number, number] })}
+        {...({ zoom: 13 } as { zoom: number })}
         style={{
           height: "100%",
           width: "100%",
         }}
       >
         <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
+          {...({
+            attribution: "&copy; OpenStreetMap contributors",
+          } as { attribution: string })}
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
@@ -1244,7 +1246,6 @@ export default function LeafletParkingMap({
                 destination.coordinates.lat,
                 destination.coordinates.lng,
               ]}
-              radius={10}
               pathOptions={{
                 color: "#ffffff",
                 weight: 3,
@@ -1308,7 +1309,9 @@ export default function LeafletParkingMap({
                 userLocation.lat,
                 userLocation.lng,
               ]}
-              radius={8}
+              {...({ radius: 8 } as {
+                radius: number;
+              })}
               pathOptions={{
                 color: "#ffffff",
                 weight: 3,
@@ -1470,7 +1473,7 @@ export default function LeafletParkingMap({
             );
           };
 
-          const icon = isSelected
+          const icon: any = isSelected
             ? selectedParkingIcon
             : isLive
             ? liveParkingIcon
@@ -1478,11 +1481,13 @@ export default function LeafletParkingMap({
             ? officialCityParkingIcon
             : normalParkingIcon;
 
+          const LotMarker = Marker as any;
+
           return (
-            <Marker
+            <LotMarker
               key={String(lot.id)}
               position={position}
-              icon={icon}
+              icon={icon as any}
               ref={(layer) => {
                 lotLayerRefs.current[
                   `lot-${String(lot.id)}`
@@ -1718,7 +1723,7 @@ export default function LeafletParkingMap({
                   </div>
                 </div>
               </Popup>
-            </Marker>
+            </LotMarker>
           );
         })}
 
@@ -1763,11 +1768,11 @@ export default function LeafletParkingMap({
               <Marker
                 key={parking.id}
                 position={position}
-                icon={normalParkingIcon}
                 ref={(layer) => {
                   lotLayerRefs.current[
                     parking.id
                   ] = layer;
+                  layer?.setIcon(normalParkingIcon);
                 }}
               >
                 <Popup>

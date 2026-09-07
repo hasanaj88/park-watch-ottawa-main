@@ -1,6 +1,6 @@
 import type { ParkingLot } from "@/types/parking";
 
-function toSupabaseCompatibleLot(lot: ParkingLot): ParkingLot {
+function toSupabaseCompatibleLot(lot: Record<string, any>): ParkingLot {
   const capacity = Number((lot as any).capacity ?? 0);
   const occupied = Number((lot as any).occupied ?? 0);
 
@@ -13,6 +13,11 @@ function toSupabaseCompatibleLot(lot: ParkingLot): ParkingLot {
 
   return {
     ...lot,
+    lot,
+    id: String((lot as any).id ?? ""),
+    name: String((lot as any).name ?? ""),
+    capacity: total,
+    occupied: occ,
     total,
     free,
     conf: (lot as any).conf ?? lot.confidence ?? undefined,

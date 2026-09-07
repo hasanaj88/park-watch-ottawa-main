@@ -708,10 +708,9 @@ const Index = () => {
   const nearbyParkingItems:
     NearbyParkingItem[] =
     useMemo(() => {
-      const lotItems:
-        NearbyParkingItem[] =
-        (displayLots as any[])
-          .map((lot: any) => {
+      const lotItems: NearbyParkingItem[] =
+        (displayLots as any[]).flatMap(
+          (lot: any): NearbyParkingItem[] => {
             const lat =
               getLatitude(lot);
 
@@ -722,114 +721,110 @@ const Index = () => {
               lat === null ||
               lng === null
             ) {
-              return null;
+              return [];
             }
 
-            return {
-              id: `lot-${String(
-                lot.id
-              )}`,
-              lotId: String(
-                lot.id
-              ),
-              name:
-                lot?.name ??
-                lot?.address ??
-                "Parking Lot",
-              kind: "lot" as const,
-              groupKey:
-                `lot-${String(
+            return [
+              {
+                id: `lot-${String(
                   lot.id
                 )}`,
-              isLive:
-                lot?.isLive === true,
-              isCityOfficial:
-                lot?.isCityOfficial ===
-                  true,
-              freeSpaces:
-                typeof lot?.free ===
-                  "number"
-                  ? lot.free
-                  : typeof lot
-                        ?.freeSpaces ===
-                      "number"
-                  ? lot.freeSpaces
-                  : null,
-              capacity:
-                Number.isFinite(
-                  Number(
-                    lot?.capacity ??
-                      lot?.total ??
-                      lot?.map_capacity
-                  )
-                )
-                  ? Number(
+                lotId: String(
+                  lot.id
+                ),
+                name:
+                  lot?.name ??
+                  lot?.address ??
+                  "Parking Lot",
+                kind: "lot" as const,
+                groupKey:
+                  `lot-${String(
+                    lot.id
+                  )}`,
+                isLive:
+                  lot?.isLive === true,
+                isCityOfficial:
+                  lot?.isCityOfficial ===
+                    true,
+                freeSpaces:
+                  typeof lot?.free ===
+                    "number"
+                    ? lot.free
+                    : typeof lot
+                          ?.freeSpaces ===
+                        "number"
+                    ? lot.freeSpaces
+                    : null,
+                capacity:
+                  Number.isFinite(
+                    Number(
                       lot?.capacity ??
                         lot?.total ??
                         lot?.map_capacity
                     )
-                  : null,
-              coordinates: {
-                lat,
-                lng,
+                  )
+                    ? Number(
+                        lot?.capacity ??
+                          lot?.total ??
+                          lot?.map_capacity
+                      )
+                    : null,
+                coordinates: {
+                  lat,
+                  lng,
+                },
               },
-            };
-          })
-          .filter(
-            (
-              item
-            ): item is NearbyParkingItem =>
-              item !== null
-          );
+            ];
+          }
+        );
 
-      const fifteenItems:
-        NearbyParkingItem[] =
-        fifteenMinSegments
-          .map((segment) => {
+      const fifteenItems: NearbyParkingItem[] =
+        fifteenMinSegments.flatMap(
+          (
+            segment
+          ): NearbyParkingItem[] => {
             const midpoint =
               getSegmentMidpoint(
                 segment.coordinates
               );
 
             if (!midpoint) {
-              return null;
+              return [];
             }
 
-            return {
-              id: `15min-${String(
-                segment.id
-              )}`,
-              name:
-                "15 Minute Free Parking",
-              kind: "15min" as const,
-              groupKey:
-                `15min-${midpoint.lat.toFixed(
-                  3
-                )}-${midpoint.lng.toFixed(
-                  3
+            return [
+              {
+                id: `15min-${String(
+                  segment.id
                 )}`,
-              coordinates:
-                midpoint,
-            };
-          })
-          .filter(
-            (
-              item
-            ): item is NearbyParkingItem =>
-              item !== null
-          );
+                name:
+                  "15 Minute Free Parking",
+                kind: "15min" as const,
+                groupKey:
+                  `15min-${midpoint.lat.toFixed(
+                    3
+                  )}-${midpoint.lng.toFixed(
+                    3
+                  )}`,
+                coordinates:
+                  midpoint,
+              },
+            ];
+          }
+        );
 
-      const paidItems:
-        NearbyParkingItem[] =
-        paidStreetSegments
-          .map((segment) => {
+      const paidItems: NearbyParkingItem[] =
+        paidStreetSegments.flatMap(
+          (
+            segment
+          ): NearbyParkingItem[] => {
             const midpoint =
               getSegmentMidpoint(
                 segment.coordinates
               );
 
             if (!midpoint) {
-              return null;
+              return [];
             }
 
             const road =
@@ -861,36 +856,33 @@ const Index = () => {
                   )}/hr`
                 : null;
 
-            return {
-              id: `paid-${String(
-                segment.id
-              )}`,
-              name: road
-                ? `Paid Parking · ${road}`
-                : "Paid Street Parking",
-              kind: "paid" as const,
-              groupKey: road
-                ? `paid-${road
-                    .toLowerCase()
-                    .replace(
-                      /\s+/g,
-                      " "
-                    )
-                    .trim()}`
-                : `paid-${String(
-                    segment.id
-                  )}`,
-              rateLabel,
-              coordinates:
-                midpoint,
-            };
-          })
-          .filter(
-            (
-              item
-            ): item is NearbyParkingItem =>
-              item !== null
-          );
+            return [
+              {
+                id: `paid-${String(
+                  segment.id
+                )}`,
+                name: road
+                  ? `Paid Parking · ${road}`
+                  : "Paid Street Parking",
+                kind: "paid" as const,
+                groupKey: road
+                  ? `paid-${road
+                      .toLowerCase()
+                      .replace(
+                        /\s+/g,
+                        " "
+                      )
+                      .trim()}`
+                  : `paid-${String(
+                      segment.id
+                    )}`,
+                rateLabel,
+                coordinates:
+                  midpoint,
+              },
+            ];
+          }
+        );
 
       return [
         ...lotItems,
