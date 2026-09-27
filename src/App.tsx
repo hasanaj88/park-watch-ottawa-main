@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import Signup from "./pages/Signup";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import "leaflet/dist/leaflet.css";
 
@@ -20,9 +22,11 @@ const App = () => (
             <Sonner />
             <BrowserRouter basename={import.meta.env.BASE_URL}>
               <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+               <Route path="/" element={<Index />} />
+               <Route path="/signup" element={<Signup />} />
+               <Route path="/login" element={<Login />} />
+              <Route path="*" element={<NotFound />} />
+             </Routes>
             </BrowserRouter>
           </TooltipProvider>
         </ThemeProvider>

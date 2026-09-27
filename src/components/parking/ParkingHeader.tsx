@@ -1,6 +1,7 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import AuthHeaderActions from "@/components/auth/AuthHeaderActions";
 import {
   Moon,
   Sun,
@@ -906,16 +907,7 @@ useEffect(() => {
       )}
     </Button>
 
-    <Button variant="ghost" size="sm">
-      Log in
-    </Button>
-
-    <Button
-      size="sm"
-      className="bg-parking-available hover:bg-parking-available/90"
-    >
-      Create account
-    </Button>
+    <AuthHeaderActions />
   </div>
 
   {/* Mobile menu */}

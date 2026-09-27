@@ -10,9 +10,9 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
-  public: {
+  graphql_public: {
     Tables: {
       [_ in never]: never
     }
@@ -20,10 +20,281 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  public: {
+    Tables: {
+      cameras: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          lat: number
+          lng: number
+          name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          lat: number
+          lng: number
+          name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          lat?: number
+          lng?: number
+          name?: string | null
+        }
+        Relationships: []
+      }
+      parking_lots: {
+        Row: {
+          address: string | null
+          address_source: string | null
+          address_updated_at: string | null
+          api_available: number | null
+          api_occupied: number | null
+          api_provider: string | null
+          api_status: string | null
+          available: number
+          capacity: number
+          created_at: string
+          data_mode: string
+          external_id: string | null
+          has_live_api: boolean
+          has_location_api: boolean
+          id: string
+          is_mock: boolean
+          is_real_location: boolean
+          last_api_seen_at: string | null
+          last_seen_at: string | null
+          lat: number | null
+          lng: number | null
+          name: string
+          ottawa_lot_id: string | null
+          search_text: string | null
+          source: string
+          status: string | null
+          updated_at: string
+          virtual_available: number | null
+          virtual_occupied: number | null
+          virtual_status: string | null
+        }
+        Insert: {
+          address?: string | null
+          address_source?: string | null
+          address_updated_at?: string | null
+          api_available?: number | null
+          api_occupied?: number | null
+          api_provider?: string | null
+          api_status?: string | null
+          available?: number
+          capacity?: number
+          created_at?: string
+          data_mode?: string
+          external_id?: string | null
+          has_live_api?: boolean
+          has_location_api?: boolean
+          id?: string
+          is_mock?: boolean
+          is_real_location?: boolean
+          last_api_seen_at?: string | null
+          last_seen_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          name: string
+          ottawa_lot_id?: string | null
+          search_text?: string | null
+          source?: string
+          status?: string | null
+          updated_at?: string
+          virtual_available?: number | null
+          virtual_occupied?: number | null
+          virtual_status?: string | null
+        }
+        Update: {
+          address?: string | null
+          address_source?: string | null
+          address_updated_at?: string | null
+          api_available?: number | null
+          api_occupied?: number | null
+          api_provider?: string | null
+          api_status?: string | null
+          available?: number
+          capacity?: number
+          created_at?: string
+          data_mode?: string
+          external_id?: string | null
+          has_live_api?: boolean
+          has_location_api?: boolean
+          id?: string
+          is_mock?: boolean
+          is_real_location?: boolean
+          last_api_seen_at?: string | null
+          last_seen_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          ottawa_lot_id?: string | null
+          search_text?: string | null
+          source?: string
+          status?: string | null
+          updated_at?: string
+          virtual_available?: number | null
+          virtual_occupied?: number | null
+          virtual_status?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      real_parking_ids: {
+        Row: {
+          map_id: string
+        }
+        Insert: {
+          map_id: string
+        }
+        Update: {
+          map_id?: string
+        }
+        Relationships: []
+      }
+      traffic_events: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          lat: number
+          lng: number
+          severity: number | null
+          type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          lat: number
+          lng: number
+          severity?: number | null
+          type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          lat?: number
+          lng?: number
+          severity?: number | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      parking_app_view: {
+        Row: {
+          map_available: number | null
+          map_capacity: number | null
+          map_data_mode: string | null
+          map_id: string | null
+          map_lat: number | null
+          map_lng: number | null
+          map_name: string | null
+          map_status: string | null
+          map_updated_at: string | null
+        }
+        Relationships: []
+      }
+      parking_lots_clean: {
+        Row: {
+          api_available: number | null
+          api_occupied: number | null
+          api_status: string | null
+          capacity: number | null
+          created_at: string | null
+          id: string | null
+          lat: number | null
+          lng: number | null
+          name: string | null
+          ottawa_lot_id: string | null
+          virtual_occupied: number | null
+        }
+        Insert: {
+          api_available?: number | null
+          api_occupied?: never
+          api_status?: string | null
+          capacity?: number | null
+          created_at?: string | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+          name?: string | null
+          ottawa_lot_id?: string | null
+          virtual_occupied?: never
+        }
+        Update: {
+          api_available?: number | null
+          api_occupied?: never
+          api_status?: string | null
+          capacity?: number | null
+          created_at?: string | null
+          id?: string | null
+          lat?: number | null
+          lng?: number | null
+          name?: string | null
+          ottawa_lot_id?: string | null
+          virtual_occupied?: never
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      user_role: "driver" | "parking_owner" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -39,12 +310,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -68,11 +339,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -93,11 +364,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -118,11 +389,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -135,11 +406,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -149,7 +420,12 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  public: {
+  graphql_public: {
     Enums: {},
+  },
+  public: {
+    Enums: {
+      user_role: ["driver", "parking_owner", "admin"],
+    },
   },
 } as const
