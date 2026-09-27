@@ -77,7 +77,14 @@ const Login = () => {
                 required
               />
             </div>
-
+             <div className="text-right">
+             <Link
+             to="/forgot-password"
+             className="text-sm font-medium text-foreground underline"
+              >
+              Forgot password?
+              </Link>
+              </div>
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
