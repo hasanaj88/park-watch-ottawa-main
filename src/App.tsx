@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Account from "./pages/Account";
+import RequireAuth from "./components/auth/RequireAuth";
 import "leaflet/dist/leaflet.css";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,14 @@ const App = () => (
                <Route path="/login" element={<Login />} />
                <Route path="/forgot-password" element={<ForgotPassword />} />
                <Route path="/reset-password" element={<ResetPassword />} />
+               <Route
+                      path="/account"
+                      element={
+               <RequireAuth>
+               <Account />
+               </RequireAuth>
+                               }
+                        />
               <Route path="*" element={<NotFound />} />
              </Routes>
             </BrowserRouter>
