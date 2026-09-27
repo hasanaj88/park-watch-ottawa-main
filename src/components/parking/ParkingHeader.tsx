@@ -1,5 +1,17 @@
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, RefreshCw, MapPin, X, Search, Loader2, Navigation } from "lucide-react";
+import {
+  Moon,
+  Sun,
+  RefreshCw,
+  MapPin,
+  X,
+  Search,
+  Loader2,
+  Navigation,
+  Menu,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -62,6 +74,12 @@ type NearbyContext =
 interface ParkingHeaderProps {
   onRefresh: () => void;
   isLoading: boolean;
+
+  onlyAvailable: boolean;
+  onOnlyAvailableChange: (checked: boolean) => void;
+onNearbyPanelVisibilityChange?: (
+  visible: boolean
+) => void;
   onFindNearby: (
     nearbyItems: NearbyParkingResult[]
   ) => void;
@@ -91,6 +109,9 @@ export const ParkingHeader = ({
   onUserLocation,
   onDestinationSelect,
   onDestinationParkingDiscovered,
+  onlyAvailable,
+  onOnlyAvailableChange,
+  onNearbyPanelVisibilityChange,
 }: ParkingHeaderProps) => {
   const { theme, setTheme } = useTheme();
 
@@ -105,11 +126,19 @@ export const ParkingHeader = ({
   ] = useState<
     NearbyParkingResult[]
   >([]);
+const [
+  showNearbyResults,
+  setShowNearbyResults,
+] = useState(false);
 
-  const [
-    showNearbyResults,
-    setShowNearbyResults,
-  ] = useState(false);
+useEffect(() => {
+  onNearbyPanelVisibilityChange?.(
+    showNearbyResults
+  );
+}, [
+  showNearbyResults,
+  onNearbyPanelVisibilityChange,
+]);
 
   const [
     nearbyMobileCollapsed,
@@ -786,129 +815,119 @@ export const ParkingHeader = ({
   return (
     <header className="sticky top-0 z-50 glass-effect border-b">
       <div className="container mx-auto px-4 py-3 relative">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="relative shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-parking-ring to-blue-500 flex items-center justify-center">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-parking-available to-parking-ring" />
-              </div>
+        <div className="flex h-12 items-center justify-between gap-4">
+  {/* Brand */}
+  <button
+    type="button"
+    onClick={() => {
+      window.location.href = "/";
+    }}
+    className="flex min-w-0 items-center gap-2.5 text-left"
+    aria-label="Ottawa Live Parking home"
+  >
+    <div className="relative shrink-0">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-parking-ring to-blue-500 shadow-sm">
+        <div className="h-5 w-5 rounded-md bg-gradient-to-br from-parking-available to-parking-ring" />
+      </div>
 
-              <button
-                onClick={() =>
-                  (window.location.href =
-                    "/")
-                }
-                className="absolute -bottom-1 -right-1 bg-parking-available text-white text-xs px-1.5 py-0.5 rounded-md font-semibold cursor-pointer"
-              >
-                LIVE
-              </button>
-            </div>
+      <span className="absolute -bottom-1 -right-1 rounded bg-parking-available px-1 py-0.5 text-[8px] font-bold leading-none text-white">
+        LIVE
+      </span>
+    </div>
 
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold truncate">
-                Ottawa Live Parking
-              </h1>
+    <div className="min-w-0">
+      <div className="truncate text-base font-bold leading-tight sm:text-lg">
+        Ottawa Live Parking
+      </div>
 
-              <p className="text-sm text-muted-foreground truncate">
-                Real-time parking availability
-              </p>
-            </div>
-          </div>
+      <div className="hidden text-xs text-muted-foreground md:block">
+        Live parking availability
+      </div>
+    </div>
+  </button>
 
-          <div className="flex items-center gap-4">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleFindNearby}
-              disabled={isGettingLocation}
-              className="gap-2 bg-parking-available hover:bg-parking-available/90"
-            >
-              <MapPin
-                className={`h-4 w-4 ${
-                  isGettingLocation
-                    ? "animate-pulse"
-                    : ""
-                }`}
-              />
+  {/* Desktop navigation */}
+  <nav className="hidden items-center gap-1 md:flex">
+    <button
+      type="button"
+      onClick={() => {
+        window.location.href = "/";
+      }}
+      className="rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+    >
+      Map
+    </button>
 
-              <span className="hidden sm:inline">
-                {isGettingLocation
-                  ? "Getting Location..."
-                  : "Parking Near You"}
-              </span>
+    <button
+      type="button"
+      className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      About
+    </button>
 
-              <span className="sm:hidden">
-                {isGettingLocation
-                  ? "Locating..."
-                  : "Nearby"}
-              </span>
-            </Button>
+    <button
+      type="button"
+      className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      Contact
+    </button>
+  </nav>
 
-            <div className="glass-effect rounded-xl px-3 py-2 hidden md:block">
-              <div className="flex gap-3 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="status-dot-available w-2 h-2 rounded-full" />
-                  <span>
-                    Available (✓)
-                  </span>
-                </div>
+  {/* Desktop actions */}
+  <div className="hidden items-center gap-2 md:flex">
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onRefresh}
+      disabled={isLoading}
+      className="h-9 w-9 p-0"
+      aria-label="Refresh parking data"
+    >
+      <RefreshCw
+        className={`h-4 w-4 ${
+          isLoading ? "animate-spin" : ""
+        }`}
+      />
+    </Button>
 
-                <div className="flex items-center gap-1.5">
-                  <div className="status-dot-busy w-2 h-2 rounded-full" />
-                  <span>
-                    Busy (✗)
-                  </span>
-                </div>
-              </div>
-            </div>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() =>
+        setTheme(isDark ? "light" : "dark")
+      }
+      className="h-9 w-9 p-0"
+      aria-label="Change theme"
+    >
+      {isDark ? (
+        <Sun className="h-4 w-4" />
+      ) : (
+        <Moon className="h-4 w-4" />
+      )}
+    </Button>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onRefresh}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${
-                    isLoading
-                      ? "animate-spin"
-                      : ""
-                  }`}
-                />
+    <Button variant="ghost" size="sm">
+      Log in
+    </Button>
 
-                <span className="hidden sm:inline">
-                  Refresh
-                </span>
-              </Button>
+    <Button
+      size="sm"
+      className="bg-parking-available hover:bg-parking-available/90"
+    >
+      Create account
+    </Button>
+  </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setTheme(
-                    isDark
-                      ? "light"
-                      : "dark"
-                  )
-                }
-                className="gap-2"
-              >
-                {isDark ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
-
-                <span className="hidden sm:inline">
-                  Theme
-                </span>
-              </Button>
-            </div>
-          </div>
-        </div>
-
+  {/* Mobile menu */}
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-10 w-10 shrink-0 rounded-xl md:hidden"
+    aria-label="Open menu"
+  >
+    <Menu className="h-5 w-5" />
+  </Button>
+</div>
         <div className="relative mx-auto mt-3 w-full max-w-3xl">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1012,12 +1031,49 @@ export const ParkingHeader = ({
               </div>
             )}
         </div>
+        <div className="mx-auto mt-2 flex w-full max-w-3xl items-center gap-2 overflow-x-auto">
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    onClick={handleFindNearby}
+    disabled={isGettingLocation}
+    className="h-9 shrink-0 rounded-full bg-background/80 px-3 shadow-sm backdrop-blur"
+  >
+    <MapPin
+      className={`mr-2 h-4 w-4 ${
+        isGettingLocation ? "animate-pulse" : ""
+      }`}
+    />
 
+    {isGettingLocation ? "Locating..." : "Near Me"}
+  </Button>
+
+  <div className="flex h-9 shrink-0 items-center gap-2 rounded-full border bg-background/80 px-3 shadow-sm backdrop-blur">
+    <Switch
+      id="headerAvailableOnly"
+      checked={onlyAvailable}
+      onCheckedChange={onOnlyAvailableChange}
+    />
+
+    <Label
+      htmlFor="headerAvailableOnly"
+      className="cursor-pointer whitespace-nowrap text-sm font-medium"
+    >
+      Available only
+    </Label>
+  </div>
+</div>
         {showNearbyResults &&
           nearbyResults.length > 0 && (
             <>
-              {/* Desktop / tablet: keep the current dropdown design. */}
-              <div className="absolute right-4 top-[calc(100%+8px)] z-[70] hidden w-[min(92vw,380px)] rounded-2xl border bg-background/95 p-3 shadow-2xl backdrop-blur sm:block">
+              {/* Desktop / tablet: render inside the right-side column. */}
+              {typeof document !== "undefined" &&
+               document.getElementById(
+                "desktop-nearby-panel-root"
+               ) &&
+                  createPortal(
+                <div className="hidden rounded-2xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:block">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
                     <div className="font-bold">
@@ -1290,8 +1346,12 @@ export const ParkingHeader = ({
                       );
                     }
                   )}
-                </div>
-              </div>
+                                </div>
+              </div>,
+              document.getElementById(
+                "desktop-nearby-panel-root"
+              )!
+            )}
 
               {/* Mobile:
                   render outside the sticky header using a portal.

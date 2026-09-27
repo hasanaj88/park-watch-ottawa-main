@@ -15,7 +15,6 @@ import {
   type NearbyParkingItem,
   type NearbyParkingResult,
 } from "@/components/parking/ParkingHeader";
-import { ParkingControls } from "@/components/parking/ParkingControls";
 import { ParkingLotDetailMap } from "@/components/parking/ParkingLotDetailMap";
 import { ParkingDetail } from "@/components/parking/ParkingDetail";
 import { ParkingList } from "@/components/parking/ParkingList";
@@ -915,6 +914,10 @@ const Index = () => {
 
   const [activeTab, setActiveTab] =
     useState("overview");
+const [
+  isNearbyPanelOpen,
+  setIsNearbyPanelOpen,
+] = useState(false);
 
   const [
     nearbyFocus,
@@ -1013,15 +1016,23 @@ const Index = () => {
     <div className="app-parking-bg">
       <div className="app-content min-h-screen">
         <ParkingHeader
-          onRefresh={
-            refreshData
-          }
-          isLoading={
-            isLoading
-          }
-          nearbyItems={
-            nearbyParkingItems
-          }
+  onRefresh={
+    refreshData
+  }
+  isLoading={
+    isLoading
+  }
+  onlyAvailable={filters.onlyAvailable}
+onOnlyAvailableChange={(checked) =>
+  updateFilters({ onlyAvailable: checked })
+}
+onNearbyPanelVisibilityChange={
+  setIsNearbyPanelOpen
+}
+  
+  nearbyItems={
+    nearbyParkingItems
+  }
           getParkPulseScoreForLocation={(
             location
           ) =>
@@ -1059,6 +1070,7 @@ const Index = () => {
 
             if (!first) {
               return;
+              
             }
 
             /*
@@ -1088,14 +1100,7 @@ const Index = () => {
         />
 
         <main className="container mx-auto px-4 py-6 pb-24">
-          <ParkingControls
-            filters={
-              filters
-            }
-            onFiltersChange={
-              updateFilters
-            }
-          />
+          
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-6">
@@ -1181,18 +1186,17 @@ const Index = () => {
                     />
                   )}
 
-                  <ParkingList
-                    lots={
-                      displayLots
-                    }
-                    selectedLotId={String(
-                      selectedLotId ??
-                        ""
-                    )}
-                    onLotSelect={
-                      selectLot
-                    }
-                  />
+                  <div id="desktop-nearby-panel-root" />
+
+                  {!isNearbyPanelOpen && (
+  <ParkingList
+    lots={displayLots}
+    selectedLotId={String(
+      selectedLotId ?? ""
+    )}
+    onLotSelect={selectLot}
+  />
+)}
                 </div>
               </div>
         </main>
