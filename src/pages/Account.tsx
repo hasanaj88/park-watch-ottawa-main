@@ -15,10 +15,19 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Account = () => {
   const [user, setUser] = useState<User | null>(null);
+
+  // Email state
   const [newEmail, setNewEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState(false);
+
+  // Password state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -33,20 +42,22 @@ const Account = () => {
 
     const email = newEmail.trim();
 
-    setError("");
-    setSuccess(false);
+    setEmailError("");
+    setEmailSuccess(false);
 
     if (!email) {
-      setError("Enter your new email address.");
+      setEmailError("Enter your new email address.");
       return;
     }
 
     if (email.toLowerCase() === user?.email?.toLowerCase()) {
-      setError("The new email must be different from your current email.");
+      setEmailError(
+        "The new email must be different from your current email."
+      );
       return;
     }
 
-    setLoading(true);
+    setEmailLoading(true);
 
     const { error: updateError } = await supabase.auth.updateUser(
       {
@@ -58,14 +69,52 @@ const Account = () => {
     );
 
     if (updateError) {
-      setError(updateError.message);
-      setLoading(false);
+      setEmailError(updateError.message);
+      setEmailLoading(false);
       return;
     }
 
-    setSuccess(true);
+    setEmailSuccess(true);
     setNewEmail("");
-    setLoading(false);
+    setEmailLoading(false);
+  };
+
+  const handlePasswordChange = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    setPasswordError("");
+    setPasswordSuccess(false);
+
+    if (newPassword.length < 8) {
+      setPasswordError(
+        "Password must be at least 8 characters."
+      );
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match.");
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      setPasswordError(updateError.message);
+      setPasswordLoading(false);
+      return;
+    }
+
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordSuccess(true);
+    setPasswordLoading(false);
   };
 
   return (
@@ -110,7 +159,7 @@ const Account = () => {
                 />
               </div>
 
-              {success && (
+              {emailSuccess && (
                 <Alert>
                   <AlertDescription>
                     Email change requested. Follow the confirmation
@@ -119,16 +168,96 @@ const Account = () => {
                 </Alert>
               )}
 
-              {error && (
+              {emailError && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>
+                    {emailError}
+                  </AlertDescription>
                 </Alert>
               )}
 
-              <Button type="submit" disabled={loading}>
-                {loading
+              <Button
+                type="submit"
+                disabled={emailLoading}
+              >
+                {emailLoading
                   ? "Sending confirmation..."
                   : "Change email"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Password</CardTitle>
+            <CardDescription>
+              Change the password used to sign in to your account.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form
+              onSubmit={handlePasswordChange}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">
+                  New password
+                </Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) =>
+                    setNewPassword(event.target.value)
+                  }
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">
+                  Confirm new password
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) =>
+                    setConfirmPassword(event.target.value)
+                  }
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </div>
+
+              {passwordSuccess && (
+                <Alert>
+                  <AlertDescription>
+                    Your password has been changed successfully.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {passwordError && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    {passwordError}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                disabled={passwordLoading}
+              >
+                {passwordLoading
+                  ? "Changing password..."
+                  : "Change password"}
               </Button>
             </form>
           </CardContent>
