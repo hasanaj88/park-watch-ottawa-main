@@ -29,6 +29,14 @@ const Account = () => {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
+  // Phone verification state
+  const [phone, setPhone] = useState("");
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [phoneStep, setPhoneStep] = useState<"phone" | "otp">("phone");
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneSuccess, setPhoneSuccess] = useState(false);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
@@ -60,9 +68,7 @@ const Account = () => {
     setEmailLoading(true);
 
     const { error: updateError } = await supabase.auth.updateUser(
-      {
-        email,
-      },
+      { email },
       {
         emailRedirectTo: `${window.location.origin}/account`,
       }
@@ -117,6 +123,94 @@ const Account = () => {
     setPasswordLoading(false);
   };
 
+  const handleSendPhoneOtp = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    const localPhone = phone.replace(/\D/g, "");
+const normalizedPhone = `+1${localPhone}`;
+
+    setPhoneError("");
+    setPhoneSuccess(false);
+
+    if (!/^\d{10}$/.test(localPhone)) {
+  setPhoneError("Enter a valid 10-digit Canadian phone number.");
+  return;
+}
+
+const verifiedPhone = user?.phone?.replace(/\D/g, "") ?? "";
+
+if (verifiedPhone === `1${localPhone}`) {
+  setPhoneError("This phone number is already verified.");
+  return;
+
+}
+    setPhoneLoading(true);
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      phone: normalizedPhone,
+    });
+
+    if (updateError) {
+      setPhoneError(updateError.message);
+      setPhoneLoading(false);
+      return;
+    }
+
+    setPhoneStep("otp");
+    setPhoneLoading(false);
+  };
+
+  const handleVerifyPhoneOtp = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    const localPhone = phone.replace(/\D/g, "");
+const normalizedPhone = `+1${localPhone}`;
+const token = phoneOtp.trim();
+    
+
+    setPhoneError("");
+    setPhoneSuccess(false);
+
+    if (!/^\d{6}$/.test(token)) {
+      setPhoneError("Enter the 6-digit verification code.");
+      return;
+    }
+
+    setPhoneLoading(true);
+
+    const { error: verifyError } = await supabase.auth.verifyOtp({
+      phone: normalizedPhone,
+      token,
+      type: "phone_change",
+    });
+
+    if (verifyError) {
+      setPhoneError(verifyError.message);
+      setPhoneLoading(false);
+      return;
+    }
+
+    const { data, error: userError } =
+      await supabase.auth.getUser();
+
+    if (userError) {
+      setPhoneError(userError.message);
+      setPhoneLoading(false);
+      return;
+    }
+
+    setUser(data.user);
+    setPhone("");
+    setPhoneOtp("");
+    setPhoneStep("phone");
+    setPhoneSuccess(true);
+    setPhoneLoading(false);
+  };
+
   return (
     <main className="min-h-screen px-4 py-10">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -127,6 +221,7 @@ const Account = () => {
           </p>
         </div>
 
+        {/* Email */}
         <Card>
           <CardHeader>
             <CardTitle>Email</CardTitle>
@@ -176,10 +271,7 @@ const Account = () => {
                 </Alert>
               )}
 
-              <Button
-                type="submit"
-                disabled={emailLoading}
-              >
+              <Button type="submit" disabled={emailLoading}>
                 {emailLoading
                   ? "Sending confirmation..."
                   : "Change email"}
@@ -188,6 +280,7 @@ const Account = () => {
           </CardContent>
         </Card>
 
+        {/* Password */}
         <Card>
           <CardHeader>
             <CardTitle>Password</CardTitle>
@@ -260,6 +353,164 @@ const Account = () => {
                   : "Change password"}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Phone verification */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Phone verification</CardTitle>
+            <CardDescription>
+              Add and verify a mobile number to strengthen your
+              account.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            {user?.phone && (
+              <div className="space-y-2">
+                <Label>Verified phone</Label>
+                <Input value={user.phone} disabled />
+              </div>
+            )}
+
+            {phoneStep === "phone" ? (
+              <form
+                onSubmit={handleSendPhoneOtp}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+  <Label htmlFor="phone">
+    Mobile phone
+  </Label>
+
+  <div className="flex">
+    <div className="flex h-10 items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm">
+      +1
+    </div>
+
+    <Input
+      id="phone"
+      type="tel"
+      inputMode="numeric"
+      value={phone}
+      onChange={(event) =>
+        setPhone(
+          event.target.value
+            .replace(/\D/g, "")
+            .slice(0, 10)
+        )
+      }
+      placeholder="6135551234"
+      autoComplete="tel-national"
+      className="rounded-l-none"
+      maxLength={10}
+      required
+    />
+  </div>
+
+  <p className="text-sm text-muted-foreground">
+    Enter your 10-digit Canadian mobile number.
+  </p>
+</div>
+
+                  
+    
+
+                {phoneSuccess && (
+                  <Alert>
+                    <AlertDescription>
+                      Your phone number has been verified
+                      successfully.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {phoneError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      {phoneError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={phoneLoading}
+                >
+                  {phoneLoading
+                    ? "Sending code..."
+                    : user?.phone
+                      ? "Change phone"
+                      : "Send verification code"}
+                </Button>
+              </form>
+            ) : (
+              <form
+                onSubmit={handleVerifyPhoneOtp}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="phoneOtp">
+                    Verification code
+                  </Label>
+
+                  <Input
+                    id="phoneOtp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={phoneOtp}
+                    onChange={(event) =>
+                      setPhoneOtp(
+                        event.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 6)
+                      )
+                    }
+                    placeholder="6-digit code"
+                    maxLength={6}
+                    required
+                  />
+
+                  <p className="text-sm text-muted-foreground">
+                    Enter the code sent to {phone}.
+                  </p>
+                </div>
+
+                {phoneError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>
+                      {phoneError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    type="submit"
+                    disabled={phoneLoading}
+                  >
+                    {phoneLoading
+                      ? "Verifying..."
+                      : "Verify phone"}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={phoneLoading}
+                    onClick={() => {
+                      setPhoneStep("phone");
+                      setPhoneOtp("");
+                      setPhoneError("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>
