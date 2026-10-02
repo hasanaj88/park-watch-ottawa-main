@@ -36,6 +36,14 @@ const Account = () => {
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [phoneSuccess, setPhoneSuccess] = useState(false);
+  // MFA / Authenticator state
+const [mfaFactorId, setMfaFactorId] = useState("");
+const [mfaQrCode, setMfaQrCode] = useState("");
+const [mfaCode, setMfaCode] = useState("");
+const [mfaLoading, setMfaLoading] = useState(false);
+const [mfaError, setMfaError] = useState("");
+const [mfaSuccess, setMfaSuccess] = useState(false);
+const [mfaStep, setMfaStep] = useState<"idle" | "verify">("idle");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -177,6 +185,7 @@ const token = phoneOtp.trim();
 
     if (!/^\d{6}$/.test(token)) {
       setPhoneError("Enter the 6-digit verification code.");
+
       return;
     }
 
@@ -203,12 +212,86 @@ const token = phoneOtp.trim();
       return;
     }
 
-    setUser(data.user);
+        setUser(data.user);
     setPhone("");
     setPhoneOtp("");
     setPhoneStep("phone");
     setPhoneSuccess(true);
     setPhoneLoading(false);
+  };
+
+  // MFA Enrollment
+  const handleEnableMfa = async () => {
+    setMfaError("");
+    setMfaSuccess(false);
+    setMfaLoading(true);
+
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: "Ottawa Live Parking",
+    });
+
+    if (error) {
+      setMfaError(error.message);
+      setMfaLoading(false);
+      return;
+    }
+    setMfaFactorId(data.id);
+    setMfaQrCode(data.totp.qr_code);
+    setMfaStep("verify");
+    setMfaLoading(false);
+  };
+
+  // Verify MFA code
+  const handleVerifyMfa = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    setMfaError("");
+    setMfaSuccess(false);
+
+    const code = mfaCode.trim();
+
+    if (!/^\d{6}$/.test(code)) {
+      setMfaError("Enter the 6-digit code from your authenticator app.");
+      return;
+    }
+
+    if (!mfaFactorId) {
+      setMfaError("Authenticator setup was not started.");
+      return;
+    }
+
+    setMfaLoading(true);
+
+    const { data: challengeData, error: challengeError } =
+      await supabase.auth.mfa.challenge({
+        factorId: mfaFactorId,
+      });
+
+    if (challengeError) {
+      setMfaError(challengeError.message);
+      setMfaLoading(false);
+      return;
+    }
+
+    const { error: verifyError } =
+      await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challengeData.id,
+        code,
+      });
+
+    if (verifyError) {
+      setMfaError(verifyError.message);
+      setMfaLoading(false);
+      return;
+    }
+
+    setMfaCode("");
+    setMfaSuccess(true);
+    setMfaLoading(false);
   };
 
   return (
@@ -413,10 +496,6 @@ const token = phoneOtp.trim();
     Enter your 10-digit Canadian mobile number.
   </p>
 </div>
-
-                  
-    
-
                 {phoneSuccess && (
                   <Alert>
                     <AlertDescription>
@@ -509,7 +588,98 @@ const token = phoneOtp.trim();
                     Cancel
                   </Button>
                 </div>
-              </form>
+                      </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* MFA / Authenticator */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Two-factor authentication</CardTitle>
+            <CardDescription>
+              Protect your account with an authenticator app.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            {mfaStep === "idle" ? (
+              <Button
+                type="button"
+                onClick={handleEnableMfa}
+                disabled={mfaLoading}
+              >
+                {mfaLoading
+                  ? "Preparing authenticator..."
+                  : "Set up authenticator"}
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Scan this QR code using Google Authenticator,
+                  Microsoft Authenticator, or another TOTP app.
+                </p>
+
+                               {mfaQrCode && (
+                  <img
+                    src={mfaQrCode}
+                    alt="Authenticator QR code"
+                    className="h-48 w-48 rounded-md border bg-white p-2"
+                  />
+                )}
+
+                <form
+                  onSubmit={handleVerifyMfa}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="mfaCode">
+                      Authenticator code
+                    </Label>
+
+                    <Input
+                      id="mfaCode"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={mfaCode}
+                      onChange={(event) =>
+                        setMfaCode(
+                          event.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 6)
+                        )
+                      }
+                      placeholder="6-digit code"
+                      maxLength={6}
+                      required
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={mfaLoading}
+                  >
+                    {mfaLoading
+                      ? "Verifying..."
+                      : "Verify and enable MFA"}
+                  </Button>
+                </form>
+
+                {mfaSuccess && (
+                  <Alert>
+                    <AlertDescription>
+                      Two-factor authentication has been enabled successfully.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            {mfaError && (
+              <Alert variant="destructive">
+                <AlertDescription>{mfaError}</AlertDescription>
+              </Alert>
             )}
           </CardContent>
         </Card>
