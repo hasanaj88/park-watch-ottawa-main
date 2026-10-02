@@ -44,12 +44,34 @@ const [mfaLoading, setMfaLoading] = useState(false);
 const [mfaError, setMfaError] = useState("");
 const [mfaSuccess, setMfaSuccess] = useState(false);
 const [mfaStep, setMfaStep] = useState<"idle" | "verify">("idle");
+const [mfaEnabled, setMfaEnabled] = useState(false);
+
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
-  }, []);
+  const loadAccount = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    setUser(userData.user);
+
+    const { data: factorsData, error: factorsError } =
+      await supabase.auth.mfa.listFactors();
+
+    if (factorsError) {
+      console.error("Unable to load MFA factors:", factorsError);
+      return;
+    }
+
+    const verifiedTotp = factorsData.totp.find(
+      (factor) => factor.status === "verified"
+    );
+
+    if (verifiedTotp) {
+      setMfaEnabled(true);
+      setMfaFactorId(verifiedTotp.id);
+    }
+  };
+
+  loadAccount();
+}, []);
 
   const handleEmailChange = async (
     event: FormEvent<HTMLFormElement>
@@ -290,8 +312,9 @@ const token = phoneOtp.trim();
     }
 
     setMfaCode("");
-    setMfaSuccess(true);
-    setMfaLoading(false);
+setMfaSuccess(true);
+setMfaEnabled(true);
+setMfaLoading(false);
   };
 
   return (
@@ -603,17 +626,23 @@ const token = phoneOtp.trim();
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {mfaStep === "idle" ? (
-              <Button
-                type="button"
-                onClick={handleEnableMfa}
-                disabled={mfaLoading}
-              >
-                {mfaLoading
-                  ? "Preparing authenticator..."
-                  : "Set up authenticator"}
-              </Button>
-            ) : (
+           {mfaEnabled ? (
+  <Alert>
+    <AlertDescription>
+      Authenticator is enabled for your account. ✓
+    </AlertDescription>
+  </Alert>
+) : mfaStep === "idle" ? (
+  <Button
+    type="button"
+    onClick={handleEnableMfa}
+    disabled={mfaLoading}
+  >
+    {mfaLoading
+      ? "Preparing authenticator..."
+      : "Set up authenticator"}
+  </Button>
+) : (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Scan this QR code using Google Authenticator,
