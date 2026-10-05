@@ -11,6 +11,9 @@ const Signup = () => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [accountType, setAccountType] = useState<
+  "driver" | "parking_owner"
+>("driver");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -27,7 +30,8 @@ const Signup = () => {
       password,
       options: {
         data: {
-          full_name: fullName.trim(),
+           full_name: fullName.trim(),
+  requested_account_type: accountType,
         },
       },
     });
@@ -77,6 +81,40 @@ const Signup = () => {
                   required
                 />
               </div>
+
+<div className="space-y-2">
+  <Label>Account type</Label>
+
+  <div className="grid grid-cols-2 gap-3">
+    <Button
+      type="button"
+      variant={accountType === "driver" ? "default" : "outline"}
+      onClick={() => setAccountType("driver")}
+    >
+      Driver
+    </Button>
+
+    <Button
+      type="button"
+      variant={
+        accountType === "parking_owner"
+          ? "default"
+          : "outline"
+      }
+      onClick={() => setAccountType("parking_owner")}
+    >
+      Parking Owner
+    </Button>
+  </div>
+
+  {accountType === "parking_owner" && (
+    <p className="text-sm text-muted-foreground">
+      Parking Owner accounts require additional verification
+      before parking locations can be managed.
+    </p>
+  )}
+</div>
+
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

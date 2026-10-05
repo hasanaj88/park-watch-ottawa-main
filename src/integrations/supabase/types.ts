@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       cameras: {
@@ -91,6 +66,7 @@ export type Database = {
           lng: number | null
           name: string
           ottawa_lot_id: string | null
+          owner_id: string | null
           search_text: string | null
           source: string
           status: string | null
@@ -123,6 +99,7 @@ export type Database = {
           lng?: number | null
           name: string
           ottawa_lot_id?: string | null
+          owner_id?: string | null
           search_text?: string | null
           source?: string
           status?: string | null
@@ -155,6 +132,7 @@ export type Database = {
           lng?: number | null
           name?: string
           ottawa_lot_id?: string | null
+          owner_id?: string | null
           search_text?: string | null
           source?: string
           status?: string | null
@@ -162,6 +140,33 @@ export type Database = {
           virtual_available?: number | null
           virtual_occupied?: number | null
           virtual_status?: string | null
+        }
+        Relationships: []
+      }
+      parking_owner_applications: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -420,9 +425,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       user_role: ["driver", "parking_owner", "admin"],

@@ -46,6 +46,24 @@ if (signInError) {
 }
 
 const user = signInData.user;
+const requestedAccountType =
+  user.user_metadata?.requested_account_type;
+
+if (requestedAccountType === "parking_owner") {
+  const { error: applicationError } = await supabase
+  .from("parking_owner_applications")
+  .insert({
+    user_id: user.id,
+  });
+
+  if (applicationError) {
+    setError(
+      `Unable to create parking owner application: ${applicationError.message}`
+    );
+    setLoading(false);
+    return;
+  }
+}
 
 const { data: profile, error: profileError } =
   await supabase

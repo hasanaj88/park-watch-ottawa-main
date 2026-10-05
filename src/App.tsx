@@ -12,6 +12,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Account from "./pages/Account";
 import RequireAuth from "./components/auth/RequireAuth";
+import RequireOwnerAuth from "./components/auth/RequireOwnerAuth";
+import OwnerDashboard from "./pages/OwnerDashboard";
 import "leaflet/dist/leaflet.css";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,14 @@ const App = () => (
                <Account />
                </RequireAuth>
                                }
+                        />
+              <Route
+               path="/owner"
+               element={
+              <RequireOwnerAuth>
+              <OwnerDashboard />
+              </RequireOwnerAuth>
+                              }
                         />
               <Route path="*" element={<NotFound />} />
              </Routes>
